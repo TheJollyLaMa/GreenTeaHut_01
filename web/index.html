@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Green Tea Hut TheJollyLaMa/GreenTeaHut_01#1 — Public Ledger</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <h1>Green Tea Hut TheJollyLaMa/GreenTeaHut_01#1 — Public Ledger</h1>
+      <button type="button" class="wallet-button">Connect Wallet</button>
+    </header>
+
+    <main>
+      <section class="summary" aria-label="Financial summary">
+        <article class="card">
+          <h2>Total Raised</h2>
+          <p id="total-raised">$0.00</p>
+        </article>
+        <article class="card">
+          <h2>Total Spent</h2>
+          <p id="total-spent">$0.00</p>
+        </article>
+        <article class="card">
+          <h2>Balance</h2>
+          <p id="balance">$0.00</p>
+        </article>
+      </section>
+
+      <section class="filters" aria-label="Ledger filters">
+        <label>
+          Type
+          <select id="type-filter">
+            <option value="ALL">All</option>
+            <option value="INCOMING">Incoming</option>
+            <option value="OUTGOING">Outgoing</option>
+          </select>
+        </label>
+
+        <label>
+          Status
+          <select id="status-filter">
+            <option value="ALL">All</option>
+            <option value="PENDING">Pending</option>
+            <option value="CONFIRMED">Confirmed</option>
+          </select>
+        </label>
+
+        <label>
+          Search
+          <input id="search-filter" type="search" placeholder="Category or description" />
+        </label>
+      </section>
+
+      <section aria-label="Ledger entries">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Amount</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Proof</th>
+              </tr>
+            </thead>
+            <tbody id="ledger-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
