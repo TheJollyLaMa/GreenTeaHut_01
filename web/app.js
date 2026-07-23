@@ -48,25 +48,50 @@ function getFilteredEntries() {
   });
 }
 
+function getSafeProofUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+  } catch (error) {}
+  return '#';
+}
+
 function renderTable() {
   const filtered = getFilteredEntries();
 
-  ledgerBody.innerHTML = filtered
-    .map(
-      (entry) => `
-      <tr>
-        <td>${entry.id}</td>
-        <td>${entry.date}</td>
-        <td>${entry.type}</td>
-        <td>${entry.status}</td>
-        <td>${formatAmount(entry.amount)}</td>
-        <td>${entry.category}</td>
-        <td>${entry.description}</td>
-        <td><a href="${entry.reference}" target="_blank" rel="noopener noreferrer">Proof</a></td>
-      </tr>
-    `
-    )
-    .join('');
+  ledgerBody.innerHTML = '';
+
+  filtered.forEach((entry) => {
+    const row = document.createElement('tr');
+    const cells = [
+      entry.id,
+      entry.date,
+      entry.type,
+      entry.status,
+      formatAmount(entry.amount),
+      entry.category,
+      entry.description,
+    ];
+
+    cells.forEach((value) => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+
+    const proofCell = document.createElement('td');
+    const proofLink = document.createElement('a');
+    proofLink.href = getSafeProofUrl(entry.reference);
+    proofLink.target = '_blank';
+    proofLink.rel = 'noopener noreferrer';
+    proofLink.textContent = 'Proof';
+    proofCell.appendChild(proofLink);
+    row.appendChild(proofCell);
+
+    ledgerBody.appendChild(row);
+  });
 }
 
 async function init() {
@@ -82,7 +107,8 @@ async function init() {
     updateSummary(entries);
     renderTable();
   } catch (error) {
-    ledgerBody.innerHTML = `<tr><td colspan="8">Unable to load ledger data.</td></tr>`;
+    ledgerBody.innerHTML =
+      '<tr><td colspan="8">Unable to load ledger data. Please check your connection and refresh the page.</td></tr>';
     console.error(error);
   }
 }
