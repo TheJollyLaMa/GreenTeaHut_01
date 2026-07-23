@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500">
+  <defs>
+    <linearGradient id="paperBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8f4e8"/>
+      <stop offset="100%" stop-color="#ede8d5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Paper background with slight texture -->
+  <rect width="800" height="500" fill="url(#paperBg)"/>
+
+  <!-- Sketch border / frame feel -->
+  <rect x="18" y="18" width="764" height="464" fill="none" stroke="#4a7c59" stroke-width="3" stroke-dasharray="12,6" rx="8"/>
+
+  <!-- Title sketch style at top -->
+  <text x="400" y="58" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#175f3b" letter-spacing="2" font-style="italic">Green Tea Party Hut — Hand-Drawn Concept</text>
+  <line x1="180" y1="68" x2="620" y2="68" stroke="#4a7c59" stroke-width="1.5" stroke-dasharray="5,3"/>
+
+  <!-- Main hut sketch (hand-drawn style using rough paths) -->
+  <!-- Ground line -->
+  <path d="M 130 380 Q 400 372 670 380" fill="none" stroke="#5d3e28" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Hut outline - slightly wobbly for hand-drawn feel -->
+  <!-- Left wall -->
+  <path d="M 200 380 L 198 260" fill="none" stroke="#333" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Right wall -->
+  <path d="M 600 380 L 602 260" fill="none" stroke="#333" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Roof left slope -->
+  <path d="M 198 260 Q 280 180 400 160" fill="none" stroke="#333" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Roof right slope -->
+  <path d="M 602 260 Q 520 180 400 160" fill="none" stroke="#333" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Roof peak detail -->
+  <path d="M 400 155 L 402 168" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Roof fill (light color, sketchy) -->
+  <path d="M 198 262 Q 280 182 400 162 Q 520 182 602 262 Z" fill="#c8a870" opacity="0.35"/>
+
+  <!-- Wall fill -->
+  <rect x="200" y="260" width="400" height="120" fill="#a07848" opacity="0.18"/>
+
+  <!-- Roof texture (thatch lines) -->
+  <g stroke="#8b6340" stroke-width="1.2" fill="none" opacity="0.6" stroke-linecap="round">
+    <path d="M 270 260 Q 310 218 340 200 Q 360 186 375 178"/>
+    <path d="M 320 262 Q 355 225 380 208 Q 395 198 405 192"/>
+    <path d="M 370 263 Q 398 235 415 220 Q 425 212 430 208"/>
+    <path d="M 430 263 Q 445 242 455 230 Q 462 222 465 218"/>
+    <path d="M 480 262 Q 490 248 495 238 Q 498 232 500 228"/>
+    <path d="M 530 261 Q 536 252 539 244"/>
+    <path d="M 240 262 Q 285 212 320 192 Q 345 180 365 172"/>
+  </g>
+
+  <!-- Door (arched, sketchy) -->
+  <path d="M 358 380 L 356 318 Q 356 295 400 293 Q 444 293 444 318 L 442 380" fill="#c8a56a" opacity="0.4" stroke="#5d3e28" stroke-width="2" stroke-linecap="round"/>
+  <!-- Door detail lines -->
+  <line x1="400" y1="295" x2="400" y2="380" stroke="#5d3e28" stroke-width="1" stroke-dasharray="4,3"/>
+  <!-- Door knob -->
+  <circle cx="430" cy="340" r="5" fill="none" stroke="#8b6340" stroke-width="2"/>
+  <!-- Door arch shading dots -->
+  <g fill="#8b6340" opacity="0.3">
+    <circle cx="372" cy="302" r="2"/>
+    <circle cx="385" cy="296" r="2"/>
+    <circle cx="400" cy="294" r="2"/>
+    <circle cx="415" cy="296" r="2"/>
+    <circle cx="428" cy="302" r="2"/>
+  </g>
+
+  <!-- Window left (round, sketchy) -->
+  <circle cx="270" cy="320" r="32" fill="#b8d8c8" opacity="0.4" stroke="#333" stroke-width="2"/>
+  <line x1="270" y1="288" x2="270" y2="352" stroke="#333" stroke-width="1.5"/>
+  <line x1="238" y1="320" x2="302" y2="320" stroke="#333" stroke-width="1.5"/>
+  <!-- Window sill -->
+  <line x1="248" y1="352" x2="292" y2="352" stroke="#5d3e28" stroke-width="2"/>
+
+  <!-- Window right (round, sketchy) -->
+  <circle cx="530" cy="320" r="32" fill="#b8d8c8" opacity="0.4" stroke="#333" stroke-width="2"/>
+  <line x1="530" y1="288" x2="530" y2="352" stroke="#333" stroke-width="1.5"/>
+  <line x1="498" y1="320" x2="562" y2="320" stroke="#333" stroke-width="1.5"/>
+  <!-- Window sill -->
+  <line x1="508" y1="352" x2="552" y2="352" stroke="#5d3e28" stroke-width="2"/>
+
+  <!-- Chimney sketch -->
+  <rect x="445" y="195" width="28" height="45" fill="none" stroke="#333" stroke-width="2" rx="2"/>
+  <!-- Smoke squiggle -->
+  <path d="M 455 193 Q 445 178 455 163 Q 465 148 455 133" fill="none" stroke="#888" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3,2"/>
+  <path d="M 465 195 Q 475 178 465 162 Q 455 146 467 132" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3,2"/>
+
+  <!-- Trees left (sketchy) -->
+  <g fill="none" stroke="#2d6e4a" stroke-linecap="round">
+    <!-- Tree 1 -->
+    <line x1="145" y1="380" x2="145" y2="295" stroke-width="3"/>
+    <path d="M 115 315 Q 145 270 175 315" fill="#5a9e72" stroke="#2d6e4a" stroke-width="1.5"/>
+    <path d="M 120 330 Q 145 288 170 330" fill="#6aae82" stroke="#2d6e4a" stroke-width="1.5"/>
+    <path d="M 125 345 Q 145 305 165 345" fill="#5a9e72" stroke="#2d6e4a" stroke-width="1.5"/>
+    <!-- Tree 2 -->
+    <line x1="668" y1="380" x2="668" y2="290" stroke-width="3"/>
+    <path d="M 638 308 Q 668 265 698 308" fill="#5a9e72" stroke="#2d6e4a" stroke-width="1.5"/>
+    <path d="M 642 325 Q 668 282 694 325" fill="#6aae82" stroke="#2d6e4a" stroke-width="1.5"/>
+    <path d="M 645 342 Q 668 302 691 342" fill="#5a9e72" stroke="#2d6e4a" stroke-width="1.5"/>
+  </g>
+
+  <!-- Garden / plants in front -->
+  <g>
+    <!-- Tea bush sketches -->
+    <path d="M 230 378 Q 225 360 240 355 Q 255 350 250 370" fill="#5a9e72" opacity="0.6" stroke="#2d6e4a" stroke-width="1.2"/>
+    <path d="M 285 376 Q 280 358 295 353 Q 310 348 305 368" fill="#5a9e72" opacity="0.6" stroke="#2d6e4a" stroke-width="1.2"/>
+    <path d="M 490 376 Q 485 358 500 353 Q 515 348 510 368" fill="#5a9e72" opacity="0.6" stroke="#2d6e4a" stroke-width="1.2"/>
+    <path d="M 545 378 Q 540 360 555 355 Q 570 350 565 370" fill="#5a9e72" opacity="0.6" stroke="#2d6e4a" stroke-width="1.2"/>
+    <!-- Small flowers -->
+    <circle cx="235" cy="373" r="4" fill="#ffe066" opacity="0.8"/>
+    <circle cx="290" cy="372" r="4" fill="#ff8a65" opacity="0.8"/>
+    <circle cx="495" cy="372" r="4" fill="#ffe066" opacity="0.8"/>
+    <circle cx="550" cy="374" r="4" fill="#ff8a65" opacity="0.8"/>
+  </g>
+
+  <!-- Annotation arrows and labels (sketch style) -->
+  <!-- Label: Cob walls -->
+  <path d="M 165 310 Q 160 300 175 295" fill="none" stroke="#175f3b" stroke-width="1.2" stroke-linecap="round"/>
+  <text x="80" y="308" font-family="Georgia, serif" font-size="11" fill="#175f3b" font-style="italic">Cob walls</text>
+  <line x1="128" y1="305" x2="160" y2="305" stroke="#175f3b" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Label: Living roof -->
+  <path d="M 400 150 Q 400 138 400 128" fill="none" stroke="#175f3b" stroke-width="1.2"/>
+  <text x="365" y="120" font-family="Georgia, serif" font-size="11" fill="#175f3b" font-style="italic">Living roof</text>
+  <line x1="400" y1="120" x2="400" y2="128" stroke="#175f3b" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Label: Tea garden -->
+  <text x="310" y="405" font-family="Georgia, serif" font-size="11" fill="#175f3b" font-style="italic">Tea garden</text>
+
+  <!-- Label: Round windows -->
+  <text x="620" y="323" font-family="Georgia, serif" font-size="11" fill="#175f3b" font-style="italic">Round</text>
+  <text x="617" y="336" font-family="Georgia, serif" font-size="11" fill="#175f3b" font-style="italic">windows</text>
+  <line x1="614" y1="322" x2="566" y2="322" stroke="#175f3b" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Compass rose (tiny, corner) -->
+  <g transform="translate(720,430)">
+    <circle cx="0" cy="0" r="18" fill="none" stroke="#4a7c59" stroke-width="1.2"/>
+    <line x1="0" y1="-14" x2="0" y2="14" stroke="#4a7c59" stroke-width="1.2"/>
+    <line x1="-14" y1="0" x2="14" y2="0" stroke="#4a7c59" stroke-width="1.2"/>
+    <text x="0" y="-16" text-anchor="middle" font-size="9" fill="#175f3b" font-family="Arial,sans-serif">N</text>
+  </g>
+
+  <!-- Scale bar -->
+  <g transform="translate(40,445)">
+    <line x1="0" y1="0" x2="80" y2="0" stroke="#5d3e28" stroke-width="2"/>
+    <line x1="0" y1="-5" x2="0" y2="5" stroke="#5d3e28" stroke-width="2"/>
+    <line x1="80" y1="-5" x2="80" y2="5" stroke="#5d3e28" stroke-width="2"/>
+    <line x1="40" y1="-3" x2="40" y2="3" stroke="#5d3e28" stroke-width="1.5"/>
+    <text x="40" y="16" text-anchor="middle" font-size="9" fill="#5d3e28" font-family="Arial,sans-serif">5m</text>
+  </g>
+
+  <!-- Caption -->
+  <rect x="0" y="462" width="800" height="38" fill="#175f3b" opacity="0.75"/>
+  <text x="400" y="487" text-anchor="middle" fill="#e8f5e9" font-family="Georgia, serif" font-size="15" letter-spacing="1">Green Tea Party Hut #1 — Hand-Drawn Concept Sketch</text>
+</svg>

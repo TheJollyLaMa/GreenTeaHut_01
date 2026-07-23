@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500">
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#d4ede1"/>
+      <stop offset="100%" stop-color="#a8d5bc"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff8e1" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#fff8e1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Sky background -->
+  <rect width="800" height="500" fill="url(#sky)"/>
+
+  <!-- Rolling hills -->
+  <ellipse cx="200" cy="480" rx="300" ry="120" fill="#5a9e72"/>
+  <ellipse cx="600" cy="490" rx="280" ry="110" fill="#4a8e62"/>
+  <ellipse cx="400" cy="460" rx="500" ry="100" fill="#6aae82"/>
+
+  <!-- Trees background -->
+  <g fill="#2d6e4a">
+    <ellipse cx="80" cy="340" rx="40" ry="55"/>
+    <rect x="76" y="370" width="8" height="40" fill="#5d3e28"/>
+    <ellipse cx="700" cy="330" rx="45" ry="60"/>
+    <rect x="696" y="360" width="9" height="45" fill="#5d3e28"/>
+    <ellipse cx="740" cy="350" rx="30" ry="45"/>
+    <rect x="737" y="375" width="7" height="35" fill="#5d3e28"/>
+  </g>
+
+  <!-- Hut / shelter structure -->
+  <g>
+    <!-- Roof -->
+    <polygon points="300,200 500,200 560,310 240,310" fill="#8b6340"/>
+    <polygon points="300,200 500,200 480,190 320,190" fill="#a07848"/>
+    <!-- Roof thatch lines -->
+    <line x1="340" y1="200" x2="310" y2="310" stroke="#6b4a28" stroke-width="1.5" stroke-opacity="0.5"/>
+    <line x1="380" y1="200" x2="355" y2="310" stroke="#6b4a28" stroke-width="1.5" stroke-opacity="0.5"/>
+    <line x1="420" y1="200" x2="405" y2="310" stroke="#6b4a28" stroke-width="1.5" stroke-opacity="0.5"/>
+    <line x1="460" y1="200" x2="455" y2="310" stroke="#6b4a28" stroke-width="1.5" stroke-opacity="0.5"/>
+    <!-- Walls -->
+    <rect x="265" y="270" width="270" height="80" fill="#c8a56a" rx="4"/>
+    <!-- Door -->
+    <rect x="370" y="290" width="60" height="60" fill="#6b4a28" rx="4"/>
+    <!-- Window left -->
+    <rect x="288" y="285" width="55" height="45" fill="#b8d8c8" rx="3"/>
+    <line x1="315" y1="285" x2="315" y2="330" stroke="#6b4a28" stroke-width="1.5"/>
+    <line x1="288" y1="308" x2="343" y2="308" stroke="#6b4a28" stroke-width="1.5"/>
+    <!-- Window right -->
+    <rect x="457" y="285" width="55" height="45" fill="#b8d8c8" rx="3"/>
+    <line x1="484" y1="285" x2="484" y2="330" stroke="#6b4a28" stroke-width="1.5"/>
+    <line x1="457" y1="308" x2="512" y2="308" stroke="#6b4a28" stroke-width="1.5"/>
+  </g>
+
+  <!-- Lanterns hanging -->
+  <g>
+    <line x1="320" y1="180" x2="320" y2="210" stroke="#8b6340" stroke-width="1.5"/>
+    <ellipse cx="320" cy="218" rx="12" ry="15" fill="#e8932a" opacity="0.9"/>
+    <ellipse cx="320" cy="218" rx="8" ry="10" fill="#ffd070" opacity="0.7"/>
+    <line x1="480" y1="180" x2="480" y2="210" stroke="#8b6340" stroke-width="1.5"/>
+    <ellipse cx="480" cy="218" rx="12" ry="15" fill="#e8932a" opacity="0.9"/>
+    <ellipse cx="480" cy="218" rx="8" ry="10" fill="#ffd070" opacity="0.7"/>
+  </g>
+
+  <!-- Lantern glow on ground -->
+  <ellipse cx="320" cy="330" rx="30" ry="8" fill="#ffd070" opacity="0.2"/>
+  <ellipse cx="480" cy="330" rx="30" ry="8" fill="#ffd070" opacity="0.2"/>
+
+  <!-- People sitting at tea -->
+  <!-- Person left -->
+  <g transform="translate(290,330)">
+    <circle cx="0" cy="-20" r="12" fill="#d4956a"/>
+    <ellipse cx="0" cy="5" rx="16" ry="20" fill="#4a7c59"/>
+    <ellipse cx="-8" cy="0" rx="12" ry="5" fill="#4a7c59" transform="rotate(-30,-8,0)"/>
+    <ellipse cx="8" cy="0" rx="12" ry="5" fill="#4a7c59" transform="rotate(30,8,0)"/>
+  </g>
+  <!-- Person right -->
+  <g transform="translate(510,330)">
+    <circle cx="0" cy="-20" r="12" fill="#c4855a"/>
+    <ellipse cx="0" cy="5" rx="16" ry="20" fill="#5a6e8e"/>
+    <ellipse cx="-8" cy="0" rx="12" ry="5" fill="#5a6e8e" transform="rotate(-30,-8,0)"/>
+    <ellipse cx="8" cy="0" rx="12" ry="5" fill="#5a6e8e" transform="rotate(30,8,0)"/>
+  </g>
+  <!-- Person front center -->
+  <g transform="translate(400,350)">
+    <circle cx="0" cy="-22" r="13" fill="#e0a070"/>
+    <ellipse cx="0" cy="6" rx="18" ry="22" fill="#7a5e3a"/>
+  </g>
+
+  <!-- Tea table / mat -->
+  <ellipse cx="400" cy="360" rx="70" ry="20" fill="#c8a56a" opacity="0.7"/>
+  <!-- Teapot -->
+  <ellipse cx="400" cy="353" rx="14" ry="10" fill="#4a7c59"/>
+  <path d="M 386 353 Q 375 348 378 343 Q 381 338 386 348" fill="none" stroke="#4a7c59" stroke-width="3"/>
+  <ellipse cx="400" cy="343" rx="6" ry="3" fill="#5a9e72"/>
+  <!-- Teacups -->
+  <ellipse cx="370" cy="362" rx="8" ry="5" fill="#f0f0e0" stroke="#c8a56a" stroke-width="1"/>
+  <ellipse cx="430" cy="362" rx="8" ry="5" fill="#f0f0e0" stroke="#c8a56a" stroke-width="1"/>
+
+  <!-- Stars / fireflies -->
+  <g fill="#fffae0" opacity="0.8">
+    <circle cx="150" cy="120" r="2"/>
+    <circle cx="200" cy="90" r="1.5"/>
+    <circle cx="620" cy="110" r="2"/>
+    <circle cx="670" cy="80" r="1.5"/>
+    <circle cx="130" cy="160" r="1"/>
+    <circle cx="640" cy="150" r="1"/>
+  </g>
+
+  <!-- Moon -->
+  <circle cx="650" cy="80" r="35" fill="#fff8d0" opacity="0.85"/>
+  <circle cx="662" cy="72" r="30" fill="#a8d5bc" opacity="0.6"/>
+
+  <!-- Caption label -->
+  <rect x="0" y="460" width="800" height="40" fill="#175f3b" opacity="0.75"/>
+  <text x="400" y="486" text-anchor="middle" fill="#e8f5e9" font-family="Georgia, serif" font-size="15" letter-spacing="1">Cozy Tea Gathering — Concept Art</text>
+</svg>
