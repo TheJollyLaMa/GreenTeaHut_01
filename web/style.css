@@ -310,6 +310,7 @@ input {
   border: 1px solid var(--line);
   border-radius: 0.5rem;
   background: #fff;
+  margin-bottom: 2rem;
 }
 
 table {
@@ -337,6 +338,112 @@ a {
   color: var(--accent);
 }
 
+.entry-section {
+  margin-bottom: 2rem;
+}
+
+.entry-helper {
+  margin: 0 0 0.8rem;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.entry-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.8rem;
+}
+
+.field-error {
+  min-height: 1rem;
+  font-size: 0.78rem;
+  color: #b91c1c;
+}
+
+.entry-submit {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 0.35rem;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  align-self: end;
+  min-height: 2.35rem;
+}
+
+.entry-submit:hover {
+  filter: brightness(1.08);
+}
+
+.roadmap-section {
+  width: calc(100% + 3rem);
+  margin: 0 -1.5rem;
+  padding: 0 1.5rem 0.4rem;
+}
+
+.roadmap-track-wrap {
+  overflow-x: auto;
+  padding-bottom: 0.6rem;
+}
+
+.roadmap-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 900px;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(120px, 1fr));
+  gap: 1rem;
+}
+
+.roadmap-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: 0.2rem;
+}
+
+.roadmap-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 0.58rem;
+  left: calc(50% + 0.5rem);
+  width: calc(100% - 1rem);
+  height: 2px;
+  background: #cbd5e1;
+  z-index: 0;
+}
+
+.roadmap-point {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #94a3b8;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #cbd5e1;
+  z-index: 1;
+}
+
+.roadmap-label {
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.roadmap-step.is-current .roadmap-point {
+  background: #16a34a;
+  box-shadow: 0 0 0 2px #16a34a, 0 0 0 6px rgba(22, 163, 74, 0.2);
+}
+
+.roadmap-step.is-current .roadmap-label {
+  color: #166534;
+}
+
 @media (max-width: 640px) {
   .bee-one {
     left: 1.25rem;
@@ -347,5 +454,11 @@ a {
     left: auto;
     right: 1.25rem;
     top: 42px;
+  }
+
+  .roadmap-section {
+    width: calc(100% + 2rem);
+    margin: 0 -1rem;
+    padding: 0 1rem 0.4rem;
   }
 }

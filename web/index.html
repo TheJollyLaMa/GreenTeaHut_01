@@ -126,6 +126,104 @@
           </table>
         </div>
       </section>
+
+      <section class="entry-section" aria-label="Add Entry to the Books">
+        <h2 class="ledger-heading">Add Entry to the Books</h2>
+        <p class="entry-helper">Submission is local preview only until onchain write is enabled.</p>
+        <form id="entry-form" class="entry-form" novalidate>
+          <label>
+            Type
+            <select id="entry-type" name="type" required>
+              <option value="">Select type</option>
+              <option value="INCOMING">INCOMING</option>
+              <option value="OUTGOING">OUTGOING</option>
+            </select>
+            <span id="entry-type-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Status
+            <select id="entry-status" name="status" required>
+              <option value="">Select status</option>
+              <option value="PENDING">PENDING</option>
+              <option value="CONFIRMED">CONFIRMED</option>
+            </select>
+            <span id="entry-status-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Amount
+            <input id="entry-amount" name="amount" type="number" min="0.01" step="0.01" required />
+            <span id="entry-amount-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Category
+            <input id="entry-category" name="category" type="text" required />
+            <span id="entry-category-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Description
+            <input id="entry-description" name="description" type="text" required />
+            <span id="entry-description-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Reference URL
+            <input id="entry-reference" name="reference" type="url" required />
+            <span id="entry-reference-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label>
+            Date
+            <input id="entry-date" name="date" type="date" required />
+            <span id="entry-date-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <button type="submit" class="entry-submit">Add Entry</button>
+        </form>
+      </section>
+
+      <section class="roadmap-section" aria-label="Project Roadmap">
+        <h2 class="ledger-heading">Project Roadmap</h2>
+        <div class="roadmap-track-wrap">
+          <ol class="roadmap-track">
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Idea</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Initial Outreach</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Initial Fund Seed</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Materials &amp; Equipment Gathering</span>
+            </li>
+            <li class="roadmap-step is-current" aria-current="step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Building Phase 1</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Building Phase 2</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Building Phase 3</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Operational</span>
+            </li>
+          </ol>
+        </div>
+      </section>
     </main>
 
     <script src="app.js"></script>
