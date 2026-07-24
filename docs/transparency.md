@@ -11,4 +11,4 @@ The public ledger tracks project funds moving in and out of Green Tea Hut #1. Ea
 Ledger updates are published at least once per month, with additional updates whenever meaningful funding or spending activity occurs.
 
 ## Proof-link policy
-Pending entries may temporarily appear without a proof link, but confirmation requires a proof/reference URL so the public can verify the recorded activity.
+Pending entries may temporarily appear without a proof link. Confirmation requires a proof/reference URL so the public can verify the recorded activity.

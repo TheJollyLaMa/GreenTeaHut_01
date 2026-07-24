@@ -378,7 +378,7 @@ function createActionsCell(entry) {
   const confirmButton = document.createElement('button');
   confirmButton.type = 'button';
   confirmButton.className = 'table-action';
-  confirmButton.textContent = 'Confirm/Settle';
+  confirmButton.textContent = 'Confirm';
   confirmButton.addEventListener('click', () => handleConfirmEntry(entry.id));
   actionsCell.appendChild(confirmButton);
 
