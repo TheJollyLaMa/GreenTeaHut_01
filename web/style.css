@@ -48,6 +48,10 @@ body {
 }
 
 .wallet-button {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 20;
   border: 1px solid var(--accent);
   background: var(--accent);
   color: #fff;
@@ -73,6 +77,8 @@ body {
 }
 
 .hero-image {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 300px;
   height: 300px;
@@ -90,6 +96,7 @@ body {
 
 .bee {
   position: absolute;
+  z-index: 2;
   font-size: 1.6rem;
   line-height: 1;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.18));
@@ -97,14 +104,14 @@ body {
 }
 
 .bee-one {
-  top: 24px;
-  left: calc(50% - 190px);
+  top: 12px;
+  left: calc(50% - 220px);
   animation: buzzOne 4.2s ease-in-out infinite;
 }
 
 .bee-two {
-  top: 68px;
-  left: calc(50% + 128px);
+  top: 52px;
+  left: calc(50% + 160px);
   animation: buzzTwo 3.6s ease-in-out infinite;
 }
 
