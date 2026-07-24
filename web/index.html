@@ -82,7 +82,7 @@
       </section>
 
       <section class="filters" aria-label="Ledger filters">
-        <label for="entry-type">
+        <label for="type-filter">
           Type
           <select id="type-filter">
             <option value="ALL">All</option>
@@ -91,7 +91,7 @@
           </select>
         </label>
 
-        <label for="entry-status">
+        <label for="status-filter">
           Status
           <select id="status-filter">
             <option value="ALL">All</option>
@@ -100,7 +100,7 @@
           </select>
         </label>
 
-        <label for="entry-amount">
+        <label for="search-filter">
           Search
           <input id="search-filter" type="search" placeholder="Category or description" />
         </label>
@@ -131,7 +131,7 @@
         <h2 class="ledger-heading">Add Entry to the Books</h2>
         <p class="entry-helper">Submission is local preview only until onchain write is enabled.</p>
         <form id="entry-form" class="entry-form" novalidate>
-          <label for="entry-category">
+          <label for="entry-type">
             Type
             <select id="entry-type" name="type" required>
               <option value="">Select type</option>
@@ -141,7 +141,7 @@
             <span id="entry-type-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label for="entry-description">
+          <label for="entry-status">
             Status
             <select id="entry-status" name="status" required>
               <option value="">Select status</option>
@@ -151,31 +151,31 @@
             <span id="entry-status-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label for="entry-reference">
+          <label for="entry-amount">
             Amount
             <input id="entry-amount" name="amount" type="number" min="0.01" step="0.01" required />
             <span id="entry-amount-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label for="entry-date">
+          <label for="entry-category">
             Category
             <input id="entry-category" name="category" type="text" required />
             <span id="entry-category-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label>
+          <label for="entry-description">
             Description
             <input id="entry-description" name="description" type="text" required />
             <span id="entry-description-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label>
+          <label for="entry-reference">
             Reference URL
             <input id="entry-reference" name="reference" type="url" required />
             <span id="entry-reference-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label>
+          <label for="entry-date">
             Date
             <input id="entry-date" name="date" type="date" required />
             <span id="entry-date-error" class="field-error" aria-live="polite"></span>
