@@ -268,7 +268,7 @@ function handleEntrySubmit(event) {
   clearFieldErrors();
 
   const type = entryTypeEl.value;
-  const status = entryStatusEl ? entryStatusEl.value : STATUS_PENDING;
+  const status = entryStatusEl.value;
   const amountValue = entryAmountEl.value.trim();
   const amount = Number(amountValue);
   const category = entryCategoryEl.value.trim();
