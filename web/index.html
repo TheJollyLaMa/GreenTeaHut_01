@@ -3,42 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Green Tea Hut TheJollyLaMa/GreenTeaHut_01#1 — Public Ledger</title>
+    <title>Green Tea Hut #1 — Public Ledger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header class="page-header">
-      <h1>Green Tea Hut TheJollyLaMa/GreenTeaHut_01#1 — Public Ledger</h1>
+      <h1 class="site-title">🍵 Green Tea Hut <span class="title-num">#1</span> 🌿</h1>
       <button type="button" class="wallet-button">Connect Wallet</button>
     </header>
 
     <main>
-      <section class="hero" aria-label="Project concept image">
+      <!-- Hero image — swap src to assets/image/green-tea-party-hut.png once the PNG is added -->
+      <section class="hero" aria-label="Green Tea Hut #1 concept art">
         <img
-          src="assets/images/tea-gathering.svg"
-          alt="Concept art of a cozy tea gathering beneath a thatched hut with a fire and teapot at the center"
+          src="assets/images/green-tea-party-hut.svg"
+          alt="Hand-drawn concept sketch of the Green Tea Party Hut #1 — cob walls, living green roof, and round windows"
           class="hero-image"
           width="300"
           height="300"
         />
       </section>
 
-      <section class="summary" aria-label="Financial summary">
-        <article class="card">
-          <h2>Total Raised</h2>
-          <p id="total-raised">Pending sync</p>
-        </article>
-        <article class="card">
-          <h2>Total Spent</h2>
-          <p id="total-spent">Pending sync</p>
-        </article>
-        <article class="card">
-          <h2>Balance</h2>
-          <p id="balance">Pending sync</p>
-        </article>
+      <!-- Financial equation displayed below the hero image -->
+      <section class="equation-section" aria-label="Financial summary">
+        <div class="equation">
+          <div class="eq-item eq-raised">
+            <div class="eq-label">Total Raised</div>
+            <div class="eq-value" id="total-raised">Pending sync</div>
+          </div>
+          <div class="eq-op" aria-hidden="true">−</div>
+          <div class="eq-item eq-spent">
+            <div class="eq-label">Total Spent</div>
+            <div class="eq-value" id="total-spent">Pending sync</div>
+          </div>
+          <div class="eq-op" aria-hidden="true">=</div>
+          <div class="eq-item eq-balance">
+            <div class="eq-label">Balance</div>
+            <div class="eq-value" id="balance">Pending sync</div>
+          </div>
+        </div>
         <p class="summary-note">Source: Manual pending entry (until contract deploy)</p>
       </section>
 
+      <!-- Ledger filters -->
       <section class="filters" aria-label="Ledger filters">
         <label>
           Type
@@ -64,7 +74,9 @@
         </label>
       </section>
 
+      <!-- Ledger entries -->
       <section aria-label="Ledger entries">
+        <h2 class="ledger-heading">📜 Public Ledger</h2>
         <div class="table-wrap">
           <table>
             <thead>
