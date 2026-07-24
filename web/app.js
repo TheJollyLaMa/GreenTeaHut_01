@@ -12,7 +12,7 @@ const aboutSlidesLink = document.getElementById('about-slides-link');
 function getPublishedSlidesOpenUrl(embedUrl) {
   try {
     const parsed = new URL(embedUrl);
-    parsed.pathname = parsed.pathname.replace('/embed', '/pub');
+    parsed.pathname = parsed.pathname.replace(/\/embed$/, '/pub');
     return parsed.toString();
   } catch (error) {
     return embedUrl;
