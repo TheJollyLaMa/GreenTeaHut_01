@@ -2,7 +2,7 @@
 
 :root {
   color-scheme: light;
-  --bg: #fef9e7;          /* pale honey-bee yellow */
+  --bg: #fef9e7;
   --card: #ffffff;
   --text: #1f2933;
   --line: #d4d8dd;
@@ -21,21 +21,21 @@ body {
   font-family: 'Nunito', Arial, sans-serif;
 }
 
-/* ── Header ─────────────────────────────────────────────── */
-
 .page-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
   margin-bottom: 1.5rem;
+  text-align: center;
 }
 
 .site-title {
   font-family: 'Pacifico', cursive;
-  font-size: clamp(1.5rem, 5vw, 2.6rem);
+  font-size: clamp(1.75rem, 5vw, 2.8rem);
   margin: 0;
+  text-align: center;
   background: linear-gradient(135deg, #f59e0b 0%, #10b981 50%, #6366f1 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -45,8 +45,8 @@ body {
 }
 
 @keyframes floatTitle {
-  0%, 100% { transform: translateY(0px) rotate(-0.5deg); }
-  50%       { transform: translateY(-6px) rotate(0.5deg); }
+  0%, 100% { transform: translateY(0) rotate(-0.5deg); }
+  50% { transform: translateY(-6px) rotate(0.5deg); }
 }
 
 .wallet-button {
@@ -66,11 +66,11 @@ body {
   transform: scale(1.04);
 }
 
-/* ── Hero image ─────────────────────────────────────────── */
-
 .hero {
+  position: relative;
   display: flex;
   justify-content: center;
+  align-items: center;
   margin: 0 0 1.5rem;
 }
 
@@ -90,7 +90,39 @@ body {
   transform: scale(1.02);
 }
 
-/* ── Financial Equation ─────────────────────────────────── */
+.bee {
+  position: absolute;
+  font-size: 1.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.18));
+  pointer-events: none;
+}
+
+.bee-one {
+  top: 24px;
+  left: calc(50% - 190px);
+  animation: buzzOne 4.2s ease-in-out infinite;
+}
+
+.bee-two {
+  top: 68px;
+  left: calc(50% + 128px);
+  animation: buzzTwo 3.6s ease-in-out infinite;
+}
+
+@keyframes buzzOne {
+  0%, 100% { transform: translate(0, 0) rotate(-8deg); }
+  25% { transform: translate(16px, -10px) rotate(8deg); }
+  50% { transform: translate(6px, 10px) rotate(-6deg); }
+  75% { transform: translate(22px, -4px) rotate(10deg); }
+}
+
+@keyframes buzzTwo {
+  0%, 100% { transform: translate(0, 0) scale(1) rotate(6deg); }
+  30% { transform: translate(-18px, -12px) scale(1.04) rotate(-10deg); }
+  60% { transform: translate(-10px, 8px) scale(0.98) rotate(8deg); }
+  85% { transform: translate(-22px, -6px) scale(1.05) rotate(-6deg); }
+}
 
 .equation-section {
   text-align: center;
@@ -126,7 +158,6 @@ body {
   line-height: 1.1;
 }
 
-/* Total Raised — green */
 .eq-raised .eq-label { color: #16a34a; }
 .eq-raised .eq-value {
   background: linear-gradient(135deg, #15803d, #4ade80);
@@ -136,7 +167,6 @@ body {
   filter: drop-shadow(0 0 9px rgba(22, 163, 74, 0.45));
 }
 
-/* Total Spent — warm red/orange */
 .eq-spent .eq-label { color: #dc2626; }
 .eq-spent .eq-value {
   background: linear-gradient(135deg, #b91c1c, #fb923c);
@@ -146,7 +176,6 @@ body {
   filter: drop-shadow(0 0 9px rgba(220, 38, 38, 0.4));
 }
 
-/* Balance — indigo/violet with pulsing glow */
 .eq-balance .eq-label { color: #4f46e5; }
 .eq-balance .eq-value {
   background: linear-gradient(135deg, #3730a3, #6366f1, #c4b5fd);
@@ -158,7 +187,7 @@ body {
 
 @keyframes balanceGlow {
   0%, 100% { filter: drop-shadow(0 0 7px rgba(99, 102, 241, 0.45)); }
-  50%       { filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.8)); }
+  50% { filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.8)); }
 }
 
 .eq-op {
@@ -175,16 +204,12 @@ body {
   margin: 0;
 }
 
-/* ── Ledger heading ─────────────────────────────────────── */
-
 .ledger-heading {
   font-family: 'Pacifico', cursive;
   font-size: 1.3rem;
   color: var(--accent);
   margin: 0 0 0.75rem;
 }
-
-/* ── Filters ─────────────────────────────────────────────── */
 
 .filters {
   display: grid;
@@ -207,8 +232,6 @@ input {
   padding: 0.45rem;
   font: inherit;
 }
-
-/* ── Table ───────────────────────────────────────────────── */
 
 .table-wrap {
   overflow-x: auto;

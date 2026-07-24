@@ -14,12 +14,6 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 
-const pendingSummary = Object.freeze({
-  totalRaised: 'Pending sync',
-  totalSpent: 'Pending sync',
-  balance: 'Pending sync',
-});
-
 function formatAmount(value) {
   return currency.format(Number(value) || 0);
 }
@@ -46,10 +40,6 @@ function renderLedgerTotals(allEntries) {
   });
 }
 
-function renderPendingSummary() {
-  renderSummary(pendingSummary);
-}
-
 function getFilteredEntries() {
   const selectedType = typeFilterEl.value;
   const selectedStatus = statusFilterEl.value;
@@ -73,6 +63,7 @@ function getSafeProofUrl(url) {
       return parsed.toString();
     }
   } catch (error) {}
+
   return '#';
 }
 
@@ -113,8 +104,6 @@ function renderTable() {
 }
 
 async function init() {
-  renderPendingSummary();
-
   try {
     const response = await fetch('../data/seed-ledger.json');
     if (!response.ok) {
@@ -124,6 +113,7 @@ async function init() {
     const data = await response.json();
     entries = Array.isArray(data.entries) ? data.entries : [];
 
+    renderLedgerTotals(entries);
     renderTable();
   } catch (error) {
     ledgerBody.innerHTML =
