@@ -161,7 +161,9 @@ function normalizeStatus(status) {
   }
 
   if (typeof status === 'string' && status.length > 0) {
-    console.warn(`Unknown ledger status "${status}" found. Defaulting to ${STATUS_PENDING}.`);
+    console.warn(
+      `Unknown ledger status "${status}" found. Valid statuses are ${STATUS_PENDING} or ${STATUS_CONFIRMED}. Defaulting to ${STATUS_PENDING}.`,
+    );
   }
 
   return STATUS_PENDING;
@@ -343,7 +345,7 @@ function handleConfirmEntry(entryId) {
   const trimmedProofUrl = proofUrl.trim();
 
   if (!trimmedProofUrl) {
-    window.alert('A proof URL is required to confirm an entry.');
+    window.alert('A valid proof URL (http/https) is required to confirm an entry.');
     return;
   }
 

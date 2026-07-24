@@ -52,7 +52,7 @@ contract ProjectLedger {
     error EmptyReferenceURI();
     error EntryAlreadyConfirmed();
     error EntryNotFound();
-    error InvalidAmount();
+    error AmountMustBePositive();
     error Unauthorized();
 
     modifier onlyOwner() {
@@ -71,7 +71,7 @@ contract ProjectLedger {
         string calldata description,
         string calldata referenceURI
     ) external onlyOwner returns (uint256 entryId) {
-        if (amount == 0) revert InvalidAmount();
+        if (amount == 0) revert AmountMustBePositive();
         if (bytes(category).length == 0) revert EmptyCategory();
         if (bytes(description).length == 0) revert EmptyDescription();
 
