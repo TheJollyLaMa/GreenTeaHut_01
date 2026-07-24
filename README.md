@@ -17,6 +17,7 @@ Project funding and spending are tracked alongside milestone progress and displa
 4. Ongoing monthly updates
 
 ### Settlement flow
-- New ledger entries begin as `PENDING`.
-- Entries move to `CONFIRMED` once a proof/reference URL is available.
-- Contract logic for the pending → confirmed flow lives in `contracts/ProjectLedger.sol`.
+- New ledger entries begin as `PENDING` (in-progress) or `REQUEST` (approved obligation, not yet disbursed).
+- Entries move to `SETTLED` once a proof/reference URL is available.
+- `REQUEST` amounts are deducted from the displayed Balance as planned expenditures.
+- On-chain contract logic uses `CONFIRMED` as its settled status (equivalent to the frontend's `SETTLED`). `REQUEST` is a frontend-only off-chain status. See `contracts/ProjectLedger.sol`.

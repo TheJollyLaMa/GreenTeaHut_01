@@ -194,7 +194,7 @@ function normalizeStatus(status) {
 
   if (typeof status === 'string' && status.length > 0) {
     console.warn(
-      `Unknown ledger status "${status}" found. Valid statuses are ${STATUS_PENDING}, ${STATUS_SETTLED}, or ${STATUS_REQUEST}. Defaulting to ${STATUS_PENDING}.`,
+      `Unknown ledger status "${status}" found. Valid statuses are ${STATUS_PENDING}, ${STATUS_SETTLED}, or ${STATUS_REQUEST}. Defaulting to ${STATUS_PENDING}. Update the entry's status field to one of the valid values to resolve this.`,
     );
   }
 

@@ -9,7 +9,7 @@ contract ProjectLedger {
 
     enum EntryStatus {
         PENDING,
-        CONFIRMED
+        CONFIRMED // Frontend displays this as "SETTLED". "REQUEST" is a frontend-only off-chain status with no contract equivalent.
     }
 
     struct Entry {
