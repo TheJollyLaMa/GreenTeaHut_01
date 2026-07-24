@@ -70,6 +70,10 @@ const ledgerBody = document.getElementById('ledger-body');
 const totalRaisedEl = document.getElementById('total-raised');
 const totalSpentEl = document.getElementById('total-spent');
 const balanceEl = document.getElementById('balance');
+const pendingRaisedEl = document.getElementById('pending-raised');
+const pendingSpentEl = document.getElementById('pending-spent');
+const requestSpentEl = document.getElementById('request-spent');
+const pendingBalanceEl = document.getElementById('pending-balance');
 const typeFilterEl = document.getElementById('type-filter');
 const statusFilterEl = document.getElementById('status-filter');
 const searchFilterEl = document.getElementById('search-filter');
@@ -79,11 +83,14 @@ const entryStatusEl = document.getElementById('entry-status');
 const entryAmountEl = document.getElementById('entry-amount');
 const entryCategoryEl = document.getElementById('entry-category');
 const entryDescriptionEl = document.getElementById('entry-description');
-const entryReferenceEl = document.getElementById('entry-reference');
+const entryProofEl = document.getElementById('entry-proof');
 const entryDateEl = document.getElementById('entry-date');
 
 let entries = [];
 let nextEntrySequence = 1;
+const STATUS_PENDING = 'PENDING';
+const STATUS_SETTLED = 'SETTLED';
+const STATUS_REQUEST = 'REQUEST';
 
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -99,21 +106,48 @@ function updateSummaryDisplay(summary) {
   totalRaisedEl.textContent = summary.totalRaised;
   totalSpentEl.textContent = summary.totalSpent;
   balanceEl.textContent = summary.balance;
+
+  if (pendingRaisedEl) pendingRaisedEl.textContent = summary.pendingRaised;
+  if (pendingSpentEl) pendingSpentEl.textContent = summary.pendingSpent;
+  if (requestSpentEl) requestSpentEl.textContent = summary.totalRequests;
+  if (pendingBalanceEl) pendingBalanceEl.textContent = summary.pendingBalance;
 }
 
 function calculateSummary(allEntries) {
-  const totalRaised = allEntries
-    .filter((entry) => entry.type === 'INCOMING')
-    .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const settledRaised = allEntries
+    .filter((e) => e.type === 'INCOMING' && e.status === STATUS_SETTLED)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
-  const totalSpent = allEntries
-    .filter((entry) => entry.type === 'OUTGOING')
-    .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const pendingRaised = allEntries
+    .filter((e) => e.type === 'INCOMING' && e.status === STATUS_PENDING)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const settledSpent = allEntries
+    .filter((e) => e.type === 'OUTGOING' && e.status === STATUS_SETTLED)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const pendingSpent = allEntries
+    .filter((e) => e.type === 'OUTGOING' && e.status === STATUS_PENDING)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const totalRequests = allEntries
+    .filter((e) => e.status === STATUS_REQUEST)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const balance = settledRaised - settledSpent;
+  const projectedRaised = settledRaised + pendingRaised;
+  const projectedSpent = settledSpent + pendingSpent;
+  const projectedBalance = projectedRaised - projectedSpent - totalRequests;
+  const hasGhostBalance = pendingRaised > 0 || pendingSpent > 0 || totalRequests > 0;
 
   updateSummaryDisplay({
-    totalRaised: formatAmount(totalRaised),
-    totalSpent: formatAmount(totalSpent),
-    balance: formatAmount(totalRaised - totalSpent),
+    totalRaised: formatAmount(settledRaised),
+    pendingRaised: pendingRaised > 0 ? `(${formatAmount(projectedRaised)})` : '',
+    totalSpent: formatAmount(settledSpent),
+    pendingSpent: pendingSpent > 0 ? `(${formatAmount(projectedSpent)})` : '',
+    totalRequests: totalRequests > 0 ? `(${formatAmount(totalRequests)})` : '',
+    balance: formatAmount(balance),
+    pendingBalance: hasGhostBalance ? `(${formatAmount(projectedBalance)})` : '',
   });
 }
 
@@ -153,6 +187,37 @@ function isValidUrl(url) {
   }
 }
 
+function normalizeStatus(status) {
+  if (status === STATUS_PENDING || status === STATUS_SETTLED || status === STATUS_REQUEST) {
+    return status;
+  }
+
+  if (typeof status === 'string' && status.length > 0) {
+    console.warn(
+      `Unknown ledger status "${status}" found. Valid statuses are ${STATUS_PENDING}, ${STATUS_SETTLED}, or ${STATUS_REQUEST}. Defaulting to ${STATUS_PENDING}. Update the entry's status field to one of the valid values to resolve this.`,
+    );
+  }
+
+  return STATUS_PENDING;
+}
+
+function normalizeEntry(entry) {
+  return {
+    id: typeof entry.id === 'string' ? entry.id : '',
+    date: typeof entry.date === 'string' ? entry.date : '',
+    type: entry.type === 'OUTGOING' ? 'OUTGOING' : 'INCOMING',
+    status: normalizeStatus(entry.status),
+    amount: Number(entry.amount) || 0,
+    category: typeof entry.category === 'string' ? entry.category : '',
+    description: typeof entry.description === 'string' ? entry.description : '',
+    reference: typeof entry.reference === 'string' ? entry.reference : '',
+    settledAt: Number(entry.settledAt) || 0,
+    auditTrail: Array.isArray(entry.auditTrail)
+      ? entry.auditTrail.map((record) => ({ ...record }))
+      : [],
+  };
+}
+
 function calculateNextEntrySequence(allEntries) {
   const maxId = allEntries.reduce((max, entry) => {
     const match = typeof entry.id === 'string' ? entry.id.match(/^L-(\d+)$/) : null;
@@ -186,7 +251,28 @@ function clearFieldErrors() {
   });
 }
 
-function handleEntrySubmit(event) {
+function appendAuditRecord(entry, eventType, details = {}) {
+  if (!Array.isArray(entry.auditTrail)) {
+    entry.auditTrail = [];
+  }
+
+  entry.auditTrail.push({
+    eventType,
+    timestamp: new Date().toISOString(),
+    ...details,
+  });
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleEntrySubmit(event) {
   event.preventDefault();
   clearFieldErrors();
 
@@ -196,7 +282,7 @@ function handleEntrySubmit(event) {
   const amount = Number(amountValue);
   const category = entryCategoryEl.value.trim();
   const description = entryDescriptionEl.value.trim();
-  const reference = entryReferenceEl.value.trim();
+  const proofFile = entryProofEl && entryProofEl.files[0] ? entryProofEl.files[0] : null;
   const date = entryDateEl.value;
 
   let hasError = false;
@@ -229,22 +315,48 @@ function handleEntrySubmit(event) {
     hasError = true;
   }
 
-  if (!reference) {
-    setFieldError('reference', 'Reference URL is required.');
-    hasError = true;
-  } else if (!isValidUrl(reference)) {
-    setFieldError('reference', 'Reference URL must be a valid http/https URL.');
-    hasError = true;
-  }
-
   if (!date) {
     setFieldError('date', 'Date is required.');
     hasError = true;
   }
 
+  if (!hasError && status === STATUS_REQUEST) {
+    const settledRaised = entries
+      .filter((e) => e.type === 'INCOMING' && e.status === STATUS_SETTLED)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const settledSpent = entries
+      .filter((e) => e.type === 'OUTGOING' && e.status === STATUS_SETTLED)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const pendingRaised = entries
+      .filter((e) => e.type === 'INCOMING' && e.status === STATUS_PENDING)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const existingRequests = entries
+      .filter((e) => e.status === STATUS_REQUEST)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const maxRequestable = settledRaised - settledSpent + pendingRaised;
+    if (existingRequests + amount > maxRequestable) {
+      const remaining = Math.max(0, maxRequestable - existingRequests);
+      setFieldError(
+        'amount',
+        `Cannot request more than available funds. Maximum requestable: ${formatAmount(remaining)}.`,
+      );
+      hasError = true;
+    }
+  }
+
   if (hasError) return;
 
-  entries.push({
+  let reference = '';
+  if (proofFile) {
+    try {
+      reference = await readFileAsDataURL(proofFile);
+    } catch {
+      setFieldError('reference', 'Failed to read the proof file. Please try again.');
+      return;
+    }
+  }
+
+  const entry = normalizeEntry({
     id: getNextEntryId(),
     date,
     type,
@@ -255,10 +367,132 @@ function handleEntrySubmit(event) {
     reference,
   });
 
+  appendAuditRecord(entry, 'ENTRY_CREATED', {
+    status,
+    proofFileName: proofFile ? proofFile.name : null,
+  });
+
+  entries.push(entry);
+
   calculateSummary(entries);
   renderTable();
   entryFormEl.reset();
   setDefaultEntryDate();
+}
+
+function getStatusBadge(status) {
+  const badge = document.createElement('span');
+  const classMap = {
+    [STATUS_SETTLED]: 'status-settled',
+    [STATUS_PENDING]: 'status-pending',
+    [STATUS_REQUEST]: 'status-request',
+  };
+  badge.className = `status-badge ${classMap[status] || 'status-pending'}`;
+  badge.textContent = status || STATUS_PENDING;
+  return badge;
+}
+
+function createProofCell(entry) {
+  const proofCell = document.createElement('td');
+
+  if (entry.reference) {
+    if (entry.reference.startsWith('data:image/')) {
+      const img = document.createElement('img');
+      img.src = entry.reference;
+      img.alt = 'Proof screenshot';
+      img.style.cssText = 'height:2rem;width:auto;cursor:pointer;border-radius:0.25rem;vertical-align:middle;';
+      img.title = 'Click to view full proof';
+      img.addEventListener('click', () => {
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(`<!doctype html><html><body style="margin:0;background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh"><img src="${entry.reference}" style="max-width:100%;height:auto;" /></body></html>`);
+        }
+      });
+      proofCell.appendChild(img);
+      return proofCell;
+    }
+
+    if (entry.reference.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = entry.reference;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'View proof';
+      proofCell.appendChild(link);
+      return proofCell;
+    }
+
+    if (isValidUrl(entry.reference)) {
+      const proofLink = document.createElement('a');
+      proofLink.href = getSafeProofUrl(entry.reference);
+      proofLink.target = '_blank';
+      proofLink.rel = 'noopener noreferrer';
+      proofLink.textContent = 'View proof';
+      proofCell.appendChild(proofLink);
+      return proofCell;
+    }
+  }
+
+  const emptyProof = document.createElement('span');
+  emptyProof.className = 'muted-text';
+  emptyProof.textContent = 'No proof yet';
+  proofCell.appendChild(emptyProof);
+  return proofCell;
+}
+
+function handleSettleEntry(entryId) {
+  const entry = entries.find((item) => item.id === entryId);
+  if (!entry || entry.status === STATUS_SETTLED) return;
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*,.pdf';
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      entry.status = STATUS_SETTLED;
+      entry.reference = reader.result;
+      entry.settledAt = Date.now();
+      appendAuditRecord(entry, 'ENTRY_SETTLED', {
+        status: STATUS_SETTLED,
+        proofFileName: file.name,
+        settledAt: entry.settledAt,
+      });
+      calculateSummary(entries);
+      renderTable();
+    };
+    reader.onerror = () => {
+      window.alert('Failed to read the proof file. Please try again.');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  fileInput.click();
+}
+
+function createActionsCell(entry) {
+  const actionsCell = document.createElement('td');
+
+  if (entry.status === STATUS_SETTLED) {
+    const settledLabel = document.createElement('span');
+    settledLabel.className = 'muted-text';
+    settledLabel.textContent = 'Settled';
+    actionsCell.appendChild(settledLabel);
+    return actionsCell;
+  }
+
+  const settleButton = document.createElement('button');
+  settleButton.type = 'button';
+  settleButton.className = 'table-action';
+  settleButton.textContent = 'Settle';
+  settleButton.addEventListener('click', () => handleSettleEntry(entry.id));
+  actionsCell.appendChild(settleButton);
+
+  return actionsCell;
 }
 
 function renderTable() {
@@ -268,30 +502,24 @@ function renderTable() {
 
   filtered.forEach((entry) => {
     const row = document.createElement('tr');
-    const cells = [
-      entry.id,
-      entry.date,
-      entry.type,
-      entry.status,
-      formatAmount(entry.amount),
-      entry.category,
-      entry.description,
-    ];
-
-    cells.forEach((value) => {
+    [entry.id, entry.date, entry.type].forEach((value) => {
       const cell = document.createElement('td');
       cell.textContent = value;
       row.appendChild(cell);
     });
 
-    const proofCell = document.createElement('td');
-    const proofLink = document.createElement('a');
-    proofLink.href = getSafeProofUrl(entry.reference);
-    proofLink.target = '_blank';
-    proofLink.rel = 'noopener noreferrer';
-    proofLink.textContent = 'Proof';
-    proofCell.appendChild(proofLink);
-    row.appendChild(proofCell);
+    const statusCell = document.createElement('td');
+    statusCell.appendChild(getStatusBadge(entry.status));
+    row.appendChild(statusCell);
+
+    [formatAmount(entry.amount), entry.category, entry.description].forEach((value) => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+
+    row.appendChild(createProofCell(entry));
+    row.appendChild(createActionsCell(entry));
 
     ledgerBody.appendChild(row);
   });
@@ -305,14 +533,14 @@ async function init() {
     }
 
     const data = await response.json();
-    entries = Array.isArray(data.entries) ? data.entries : [];
+    entries = Array.isArray(data.entries) ? data.entries.map(normalizeEntry) : [];
     nextEntrySequence = calculateNextEntrySequence(entries);
 
     calculateSummary(entries);
     renderTable();
   } catch (error) {
     ledgerBody.innerHTML =
-      '<tr><td colspan="8">Unable to load ledger data. Please check your connection and refresh the page.</td></tr>';
+      '<tr><td colspan="9">Unable to load ledger data. Please check your connection and refresh the page.</td></tr>';
     console.error(error);
   }
 }

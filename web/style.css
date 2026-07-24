@@ -5,6 +5,10 @@
   --text: #1f2933;
   --line: #d4d8dd;
   --accent: #175f3b;
+  --pending-bg: #fef3c7;
+  --pending-text: #92400e;
+  --confirmed-bg: #dcfce7;
+  --confirmed-text: #166534;
 }
 
 * {
@@ -316,6 +320,10 @@ input {
   font: inherit;
 }
 
+input[readonly] {
+  background: #f8fafc;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -349,6 +357,55 @@ a {
   color: var(--accent);
 }
 
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 6.5rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.status-pending {
+  background: var(--pending-bg);
+  color: var(--pending-text);
+}
+
+.status-settled {
+  background: var(--confirmed-bg);
+  color: var(--confirmed-text);
+}
+
+.status-request {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.eq-ghost {
+  font-size: 0.8rem;
+  font-style: italic;
+  min-height: 1.15rem;
+  line-height: 1.15;
+  opacity: 0.45;
+  letter-spacing: 0.01em;
+}
+
+.eq-ghost:empty {
+  visibility: hidden;
+}
+
+.eq-ghost-pending {
+  color: #64748b;
+}
+
+.eq-ghost-request {
+  color: #7c3aed;
+}
+
+
 .entry-section {
   margin-bottom: 2rem;
 }
@@ -371,6 +428,11 @@ a {
   color: #b91c1c;
 }
 
+.field-note {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
 .entry-submit {
   border: 1px solid var(--accent);
   background: var(--accent);
@@ -386,6 +448,22 @@ a {
 
 .entry-submit:hover {
   filter: brightness(1.08);
+}
+
+.table-action {
+  border: 1px solid var(--accent);
+  background: #fff;
+  color: var(--accent);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.table-action:hover {
+  background: #ecfdf5;
 }
 
 .roadmap-section {

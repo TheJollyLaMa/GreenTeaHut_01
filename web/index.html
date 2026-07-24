@@ -75,21 +75,25 @@
       <section class="equation-section" aria-label="Financial summary">
         <div class="equation">
           <div class="eq-item eq-raised">
+            <div class="eq-ghost eq-ghost-pending" id="pending-raised" aria-label="With pending transactions"></div>
             <div class="eq-label">Total Raised</div>
             <div class="eq-value" id="total-raised">Loading...</div>
           </div>
           <div class="eq-op" aria-hidden="true">−</div>
           <div class="eq-item eq-spent">
+            <div class="eq-ghost eq-ghost-request" id="request-spent" aria-label="Requested amounts"></div>
+            <div class="eq-ghost eq-ghost-pending" id="pending-spent" aria-label="With pending transactions"></div>
             <div class="eq-label">Total Spent</div>
             <div class="eq-value" id="total-spent">Loading...</div>
           </div>
           <div class="eq-op" aria-hidden="true">=</div>
           <div class="eq-item eq-balance">
+            <div class="eq-ghost eq-ghost-pending" id="pending-balance" aria-label="Projected balance with pending"></div>
             <div class="eq-label">Balance</div>
             <div class="eq-value" id="balance">Loading...</div>
           </div>
         </div>
-        <p class="summary-note">Source: Manual pending entry (until contract deploy)</p>
+        <p class="summary-note">Settled totals shown. Ghostly numbers above include pending &amp; requested amounts.</p>
       </section>
 
       <section class="roadmap-section" aria-label="Project Roadmap">
@@ -147,7 +151,7 @@
           <select id="status-filter">
             <option value="ALL">All</option>
             <option value="PENDING">Pending</option>
-            <option value="CONFIRMED">Confirmed</option>
+            <option value="SETTLED">Settled</option>
             <option value="REQUEST">Request</option>
           </select>
         </label>
@@ -172,6 +176,7 @@
                 <th>Category</th>
                 <th>Description</th>
                 <th>Proof</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="ledger-body"></tbody>
@@ -181,7 +186,7 @@
 
       <section class="entry-section" aria-label="Add Entry to the Books">
         <h2 class="ledger-heading">Add Entry to the Books</h2>
-        <p class="entry-helper">Submission is local preview only until onchain write is enabled.</p>
+        <p class="entry-helper">Choose a status: PENDING for in-progress transactions, REQUEST for approved-but-unpaid obligations, or SETTLED for completed ones.</p>
         <form id="entry-form" class="entry-form" novalidate>
           <label for="entry-type">
             Type
@@ -196,9 +201,8 @@
           <label for="entry-status">
             Status
             <select id="entry-status" name="status" required>
-              <option value="">Select status</option>
               <option value="PENDING">PENDING</option>
-              <option value="CONFIRMED">CONFIRMED</option>
+              <option value="SETTLED">SETTLED</option>
               <option value="REQUEST">REQUEST</option>
             </select>
             <span id="entry-status-error" class="field-error" aria-live="polite"></span>
@@ -222,9 +226,9 @@
             <span id="entry-description-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label for="entry-reference">
-            Reference URL
-            <input id="entry-reference" name="reference" type="url" required />
+          <label for="entry-proof">
+            Proof Screenshot (optional)
+            <input id="entry-proof" name="proof" type="file" accept="image/*,.pdf" />
             <span id="entry-reference-error" class="field-error" aria-live="polite"></span>
           </label>
 
