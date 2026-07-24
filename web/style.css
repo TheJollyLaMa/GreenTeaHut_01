@@ -269,3 +269,16 @@ tbody tr:last-child td {
 a {
   color: var(--accent);
 }
+
+@media (max-width: 640px) {
+  .bee-one {
+    left: 1.25rem;
+    top: 10px;
+  }
+
+  .bee-two {
+    left: auto;
+    right: 1.25rem;
+    top: 42px;
+  }
+}
