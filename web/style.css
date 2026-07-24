@@ -42,6 +42,20 @@ h1 {
   cursor: pointer;
 }
 
+.hero {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 1.5rem;
+}
+
+.hero-image {
+  display: block;
+  width: 300px;
+  height: 300px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
 .summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -65,6 +79,13 @@ h1 {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
+}
+
+.summary-note {
+  grid-column: 1 / -1;
+  margin: -0.1rem 0 0;
+  font-size: 0.8rem;
+  color: #52606d;
 }
 
 .filters {

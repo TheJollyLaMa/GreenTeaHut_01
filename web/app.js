@@ -14,11 +14,23 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 
+const pendingSummary = Object.freeze({
+  totalRaised: 'Pending sync',
+  totalSpent: 'Pending sync',
+  balance: 'Pending sync',
+});
+
 function formatAmount(value) {
   return currency.format(Number(value) || 0);
 }
 
-function updateSummary(allEntries) {
+function renderSummary(summary) {
+  totalRaisedEl.textContent = summary.totalRaised;
+  totalSpentEl.textContent = summary.totalSpent;
+  balanceEl.textContent = summary.balance;
+}
+
+function renderLedgerTotals(allEntries) {
   const totalRaised = allEntries
     .filter((entry) => entry.type === 'INCOMING')
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
@@ -27,9 +39,15 @@ function updateSummary(allEntries) {
     .filter((entry) => entry.type === 'OUTGOING')
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
 
-  totalRaisedEl.textContent = formatAmount(totalRaised);
-  totalSpentEl.textContent = formatAmount(totalSpent);
-  balanceEl.textContent = formatAmount(totalRaised - totalSpent);
+  renderSummary({
+    totalRaised: formatAmount(totalRaised),
+    totalSpent: formatAmount(totalSpent),
+    balance: formatAmount(totalRaised - totalSpent),
+  });
+}
+
+function showPendingSummary() {
+  renderSummary(pendingSummary);
 }
 
 function getFilteredEntries() {
@@ -95,6 +113,8 @@ function renderTable() {
 }
 
 async function init() {
+  showPendingSummary();
+
   try {
     const response = await fetch('../data/seed-ledger.json');
     if (!response.ok) {
@@ -104,9 +124,9 @@ async function init() {
     const data = await response.json();
     entries = Array.isArray(data.entries) ? data.entries : [];
 
-    updateSummary(entries);
     renderTable();
   } catch (error) {
+    showPendingSummary();
     ledgerBody.innerHTML =
       '<tr><td colspan="8">Unable to load ledger data. Please check your connection and refresh the page.</td></tr>';
     console.error(error);
