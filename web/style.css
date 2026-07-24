@@ -86,6 +86,12 @@ body {
   object-fit: contain;
 }
 
+.wallet-status {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
 /* About modal */
 .modal-backdrop {
   position: fixed;
@@ -416,6 +422,23 @@ a {
   color: #64748b;
 }
 
+.tx-status {
+  margin: 0 0 0.8rem;
+  font-size: 0.85rem;
+}
+
+.tx-status.info {
+  color: #1d4ed8;
+}
+
+.tx-status.success {
+  color: #166534;
+}
+
+.tx-status.error {
+  color: #b91c1c;
+}
+
 .entry-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -450,6 +473,13 @@ a {
   filter: brightness(1.08);
 }
 
+button:disabled,
+input:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .table-action {
   border: 1px solid var(--accent);
   background: #fff;
@@ -464,6 +494,12 @@ a {
 
 .table-action:hover {
   background: #ecfdf5;
+}
+
+.actions-wrap {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
 }
 
 .roadmap-section {
