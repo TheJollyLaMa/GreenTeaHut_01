@@ -2,7 +2,7 @@
 ## Green Tea Hut #1 — Public Accountability Ledger
 The Green Tea Party's first project, Green tea Hut #1. 
 
-Project funding and spending are tracked alongside milestoen progress and displayed publicly for donors, sponsors, and fans to follow along with where their energy and attention is going.
+Project funding and spending are tracked alongside milestone progress and displayed publicly for donors, sponsors, and fans to follow along with where their energy and attention is going.
 
 ### 🌐 Live Frontend
 **[https://thejollylama.github.io/GreenTeaHut_01/web/](https://thejollylama.github.io/GreenTeaHut_01/web/)**

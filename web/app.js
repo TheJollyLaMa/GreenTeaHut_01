@@ -1,35 +1,37 @@
 // --- About modal ---
 const aboutModal = document.getElementById('about-modal');
 const aboutTrigger = document.getElementById('about-trigger');
-const modalClose = aboutModal.querySelector('.modal-close');
+const modalClose = aboutModal && aboutModal.querySelector('.modal-close');
 
-function openAboutModal() {
-  aboutModal.hidden = false;
-  modalClose.focus();
-}
-
-function closeAboutModal() {
-  aboutModal.hidden = true;
-  aboutTrigger.focus();
-}
-
-aboutTrigger.addEventListener('click', openAboutModal);
-aboutTrigger.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    openAboutModal();
+if (aboutModal && aboutTrigger && modalClose) {
+  function openAboutModal() {
+    aboutModal.hidden = false;
+    modalClose.focus();
   }
-});
 
-modalClose.addEventListener('click', closeAboutModal);
+  function closeAboutModal() {
+    aboutModal.hidden = true;
+    aboutTrigger.focus();
+  }
 
-aboutModal.addEventListener('click', (e) => {
-  if (e.target === aboutModal) closeAboutModal();
-});
+  aboutTrigger.addEventListener('click', openAboutModal);
+  aboutTrigger.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openAboutModal();
+    }
+  });
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !aboutModal.hidden) closeAboutModal();
-});
+  modalClose.addEventListener('click', closeAboutModal);
+
+  aboutModal.addEventListener('click', (e) => {
+    if (e.target === aboutModal) closeAboutModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !aboutModal.hidden) closeAboutModal();
+  });
+}
 
 // --- Ledger ---
 const ledgerBody = document.getElementById('ledger-body');
