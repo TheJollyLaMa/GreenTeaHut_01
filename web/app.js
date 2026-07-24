@@ -154,6 +154,7 @@ function handleEntrySubmit(event) {
   const type = entryTypeEl.value;
   const status = entryStatusEl.value;
   const amountValue = entryAmountEl.value.trim();
+  const amount = Number(amountValue);
   const category = entryCategoryEl.value.trim();
   const description = entryDescriptionEl.value.trim();
   const reference = entryReferenceEl.value.trim();
@@ -174,8 +175,8 @@ function handleEntrySubmit(event) {
   if (!amountValue) {
     setFieldError('amount', 'Amount is required.');
     hasError = true;
-  } else if (Number.isNaN(Number(amountValue)) || Number(amountValue) <= 0) {
-    setFieldError('amount', 'Amount must be a number greater than 0.');
+  } else if (Number.isNaN(amount) || amount < 0.01) {
+    setFieldError('amount', 'Amount must be a number greater than or equal to 0.01.');
     hasError = true;
   }
 
@@ -193,7 +194,7 @@ function handleEntrySubmit(event) {
     setFieldError('reference', 'Reference URL is required.');
     hasError = true;
   } else if (!isValidUrl(reference)) {
-    setFieldError('reference', 'Reference URL must be valid http/https URL.');
+    setFieldError('reference', 'Reference URL must be a valid http/https URL.');
     hasError = true;
   }
 
@@ -209,7 +210,7 @@ function handleEntrySubmit(event) {
     date,
     type,
     status,
-    amount: Number(amountValue),
+    amount,
     category,
     description,
     reference,
