@@ -72,6 +72,7 @@ const LEDGER_CONFIG = {
   targetChainName: 'Sepolia',
   explorerBaseUrl: 'https://sepolia.etherscan.io/tx/',
   rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+  entryPageSize: 20,
   adminAllowlist: ['0x807061DF657A7697c04045dA7d16D941861cAABc'],
 };
 
@@ -402,11 +403,17 @@ function renderStateRow(message) {
 
 function renderTable() {
   const filtered = getFilteredEntries();
+  const hasActiveFilters =
+    typeFilterEl.value !== 'ALL' || statusFilterEl.value !== 'ALL' || searchFilterEl.value.trim().length > 0;
 
   ledgerBody.innerHTML = '';
 
   if (filtered.length === 0) {
-    renderStateRow('No ledger entries found on-chain for the selected filters.');
+    renderStateRow(
+      hasActiveFilters
+        ? 'No ledger entries match the selected filters.'
+        : 'No ledger entries have been recorded on-chain yet.',
+    );
     return;
   }
 
@@ -473,7 +480,7 @@ async function fetchEntriesFromContract() {
 
   if (totalEntries === 0) return [];
 
-  const pageSize = 20;
+  const pageSize = LEDGER_CONFIG.entryPageSize;
   const loaded = [];
 
   for (let start = 1; start <= totalEntries; start += pageSize) {
