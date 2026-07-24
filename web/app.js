@@ -24,7 +24,7 @@ function renderSummary(summary) {
   balanceEl.textContent = summary.balance;
 }
 
-function renderLedgerTotals(allEntries) {
+function updateSummaryFromEntries(allEntries) {
   const totalRaised = allEntries
     .filter((entry) => entry.type === 'INCOMING')
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
@@ -113,7 +113,7 @@ async function init() {
     const data = await response.json();
     entries = Array.isArray(data.entries) ? data.entries : [];
 
-    renderLedgerTotals(entries);
+    updateSummaryFromEntries(entries);
     renderTable();
   } catch (error) {
     ledgerBody.innerHTML =
