@@ -1,7 +1,39 @@
 // --- About modal ---
+// Must be a Google Slides "Publish to web" embed URL (not edit URL).
+const ABOUT_SLIDES_EMBED_URL =
+  'https://docs.google.com/presentation/d/e/2PACX-1vSryqtYkNSuw7wgg8m5Vdi1oaBRN9gIIO-LXlaOWMzHJFc8v9nPeXAbKkKtcbS2n8BOwPBaJjPFy-uv/embed?start=false&loop=false&delayms=3000';
+
 const aboutModal = document.getElementById('about-modal');
 const aboutTrigger = document.getElementById('about-trigger');
 const modalClose = aboutModal && aboutModal.querySelector('.modal-close');
+const aboutSlidesEmbed = document.getElementById('about-slides-embed');
+const aboutSlidesLink = document.getElementById('about-slides-link');
+
+function getPublishedSlidesOpenUrl(embedUrl) {
+  try {
+    const parsed = new URL(embedUrl);
+    const pathSegments = parsed.pathname.split('/');
+    if (pathSegments[pathSegments.length - 1] === 'embed') {
+      pathSegments[pathSegments.length - 1] = 'pub';
+      parsed.pathname = pathSegments.join('/');
+    }
+    return parsed.toString();
+  } catch (error) {
+    console.warn(
+      'Failed to parse ABOUT_SLIDES_EMBED_URL as a valid URL; using embed URL for fallback link.',
+      error,
+    );
+    return embedUrl;
+  }
+}
+
+if (aboutSlidesEmbed) {
+  aboutSlidesEmbed.src = ABOUT_SLIDES_EMBED_URL;
+}
+
+if (aboutSlidesLink) {
+  aboutSlidesLink.href = getPublishedSlidesOpenUrl(ABOUT_SLIDES_EMBED_URL);
+}
 
 if (aboutModal && aboutTrigger && modalClose) {
   function openAboutModal() {
