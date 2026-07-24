@@ -75,7 +75,6 @@ const statusFilterEl = document.getElementById('status-filter');
 const searchFilterEl = document.getElementById('search-filter');
 const entryFormEl = document.getElementById('entry-form');
 const entryTypeEl = document.getElementById('entry-type');
-const entryStatusEl = document.getElementById('entry-status');
 const entryAmountEl = document.getElementById('entry-amount');
 const entryCategoryEl = document.getElementById('entry-category');
 const entryDescriptionEl = document.getElementById('entry-description');
@@ -180,7 +179,9 @@ function normalizeEntry(entry) {
     description: typeof entry.description === 'string' ? entry.description : '',
     reference: typeof entry.reference === 'string' ? entry.reference : '',
     settledAt: Number(entry.settledAt) || 0,
-    auditTrail: Array.isArray(entry.auditTrail) ? entry.auditTrail : [],
+    auditTrail: Array.isArray(entry.auditTrail)
+      ? entry.auditTrail.map((record) => ({ ...record }))
+      : [],
   };
 }
 
@@ -234,7 +235,7 @@ function handleEntrySubmit(event) {
   clearFieldErrors();
 
   const type = entryTypeEl.value;
-  const status = entryStatusEl.value || STATUS_PENDING;
+  const status = STATUS_PENDING;
   const amountValue = entryAmountEl.value.trim();
   const amount = Number(amountValue);
   const category = entryCategoryEl.value.trim();
