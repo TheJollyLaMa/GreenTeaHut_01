@@ -155,10 +155,22 @@ function isValidUrl(url) {
   }
 }
 
+function normalizeStatus(status) {
+  if (status === STATUS_PENDING || status === STATUS_CONFIRMED) {
+    return status;
+  }
+
+  if (typeof status === 'string' && status.length > 0) {
+    console.warn(`Unknown ledger status "${status}" found. Defaulting to ${STATUS_PENDING}.`);
+  }
+
+  return STATUS_PENDING;
+}
+
 function normalizeEntry(entry) {
   return {
     ...entry,
-    status: entry.status === STATUS_CONFIRMED ? STATUS_CONFIRMED : STATUS_PENDING,
+    status: normalizeStatus(entry.status),
     reference: typeof entry.reference === 'string' ? entry.reference : '',
     settledAt: Number(entry.settledAt) || 0,
     auditTrail: Array.isArray(entry.auditTrail) ? entry.auditTrail : [],

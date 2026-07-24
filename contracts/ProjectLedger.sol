@@ -39,7 +39,12 @@ contract ProjectLedger {
         string referenceURI,
         uint256 createdAt
     );
-    event EntryConfirmed(uint256 indexed id, string referenceURI, uint256 settledAt);
+    event EntryConfirmed(
+        uint256 indexed id,
+        string previousReferenceURI,
+        string referenceURI,
+        uint256 settledAt
+    );
     event EntryReferenceUpdated(uint256 indexed id, string previousReferenceURI, string newReferenceURI);
 
     error EmptyCategory();
@@ -103,11 +108,12 @@ contract ProjectLedger {
         if (entry.status == EntryStatus.CONFIRMED) revert EntryAlreadyConfirmed();
         if (bytes(referenceURI).length == 0) revert EmptyReferenceURI();
 
+        string memory previousReferenceURI = entry.referenceURI;
         entry.status = EntryStatus.CONFIRMED;
         entry.referenceURI = referenceURI;
         entry.settledAt = block.timestamp;
 
-        emit EntryConfirmed(entryId, referenceURI, entry.settledAt);
+        emit EntryConfirmed(entryId, previousReferenceURI, referenceURI, entry.settledAt);
     }
 
     function updateReferenceURI(uint256 entryId, string calldata referenceURI) external onlyOwner {
