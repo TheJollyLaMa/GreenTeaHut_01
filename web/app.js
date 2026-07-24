@@ -15,7 +15,10 @@ function getPublishedSlidesOpenUrl(embedUrl) {
     parsed.pathname = parsed.pathname.replace(/\/embed$/, '/pub');
     return parsed.toString();
   } catch (error) {
-    console.warn('Invalid ABOUT_SLIDES_EMBED_URL; using embed URL for fallback link.', error);
+    console.warn(
+      'Failed to parse ABOUT_SLIDES_EMBED_URL as a valid URL; using embed URL for fallback link.',
+      error,
+    );
     return embedUrl;
   }
 }
