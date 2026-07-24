@@ -584,6 +584,9 @@ function parseSubmissionValues() {
   } else if (Number.isNaN(amount) || amount < 1) {
     setFieldError('amount', 'Amount must be a number greater than or equal to 1.');
     hasError = true;
+  } else if (!Number.isInteger(amount)) {
+    setFieldError('amount', 'Amount must be a whole number.');
+    hasError = true;
   }
 
   if (!category) {
@@ -605,7 +608,7 @@ function parseSubmissionValues() {
     hasError,
     values: {
       type,
-      amount: Math.round(amount),
+      amount,
       category,
       description,
       proofUrl,
