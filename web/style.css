@@ -47,25 +47,92 @@ body {
   50% { transform: translateY(-6px) rotate(0.5deg); }
 }
 
+.site-title {
+  cursor: pointer;
+}
+
+.site-title:focus-visible {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: 0.25rem;
+}
+
 .wallet-button {
   position: fixed;
-  top: 1rem;
-  right: 1rem;
+  top: 0.75rem;
+  right: 0.75rem;
   z-index: 20;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: #fff;
-  padding: 0.5rem 0.8rem;
-  border-radius: 0.35rem;
+  border: 2px solid transparent;
+  background: transparent;
+  padding: 0.2rem;
+  border-radius: 0.5rem;
   cursor: pointer;
-  font-family: 'Nunito', inherit;
-  font-weight: 700;
-  transition: background 0.2s, transform 0.1s;
+  transition: transform 0.15s, border-color 0.2s;
 }
 
 .wallet-button:hover {
-  background: #0f4229;
-  transform: scale(1.04);
+  transform: scale(1.08);
+  border-color: var(--accent);
+}
+
+.wallet-icon {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+/* About modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-backdrop[hidden] {
+  display: none;
+}
+
+.modal-box {
+  position: relative;
+  background: var(--card);
+  border-radius: 0.75rem;
+  padding: 2rem 2rem 1.75rem;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+}
+
+.modal-title {
+  font-family: 'Pacifico', cursive;
+  font-size: 1.4rem;
+  color: var(--accent);
+  margin: 0 0 0.75rem;
+}
+
+.modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #64748b;
+  line-height: 1;
+  padding: 0.25rem 0.4rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s, background 0.15s;
+}
+
+.modal-close:hover {
+  color: var(--text);
+  background: var(--line);
 }
 
 .hero {
