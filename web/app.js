@@ -1,7 +1,21 @@
 // --- About modal ---
+// Must be a Google Slides "Publish to web" embed URL (not edit URL).
+const ABOUT_SLIDES_EMBED_URL =
+  'https://docs.google.com/presentation/d/e/REPLACE_WITH_PUBLISHED_EMBED_ID/embed?start=false&loop=false&delayms=3000';
+
 const aboutModal = document.getElementById('about-modal');
 const aboutTrigger = document.getElementById('about-trigger');
 const modalClose = aboutModal && aboutModal.querySelector('.modal-close');
+const aboutSlidesEmbed = document.getElementById('about-slides-embed');
+const aboutSlidesLink = document.getElementById('about-slides-link');
+
+if (aboutSlidesEmbed) {
+  aboutSlidesEmbed.src = ABOUT_SLIDES_EMBED_URL;
+}
+
+if (aboutSlidesLink) {
+  aboutSlidesLink.href = ABOUT_SLIDES_EMBED_URL;
+}
 
 if (aboutModal && aboutTrigger && modalClose) {
   function openAboutModal() {
