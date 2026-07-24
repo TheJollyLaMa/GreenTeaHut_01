@@ -51,6 +51,7 @@ const entryReferenceEl = document.getElementById('entry-reference');
 const entryDateEl = document.getElementById('entry-date');
 
 let entries = [];
+let nextEntrySequence = 1;
 
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -120,14 +121,20 @@ function isValidUrl(url) {
   }
 }
 
-function getNextEntryId() {
-  const maxId = entries.reduce((max, entry) => {
+function calculateNextEntrySequence(allEntries) {
+  const maxId = allEntries.reduce((max, entry) => {
     const match = typeof entry.id === 'string' ? entry.id.match(/^L-(\d+)$/) : null;
     if (!match) return max;
     return Math.max(max, Number(match[1]));
   }, 0);
 
-  return `L-${String(maxId + 1).padStart(3, '0')}`;
+  return maxId + 1;
+}
+
+function getNextEntryId() {
+  const nextId = `L-${String(nextEntrySequence).padStart(3, '0')}`;
+  nextEntrySequence += 1;
+  return nextId;
 }
 
 function setDefaultEntryDate() {
@@ -267,6 +274,7 @@ async function init() {
 
     const data = await response.json();
     entries = Array.isArray(data.entries) ? data.entries : [];
+    nextEntrySequence = calculateNextEntrySequence(entries);
 
     calculateSummary(entries);
     renderTable();

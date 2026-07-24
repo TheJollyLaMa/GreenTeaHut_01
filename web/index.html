@@ -82,7 +82,7 @@
       </section>
 
       <section class="filters" aria-label="Ledger filters">
-        <label>
+        <label for="entry-type">
           Type
           <select id="type-filter">
             <option value="ALL">All</option>
@@ -91,7 +91,7 @@
           </select>
         </label>
 
-        <label>
+        <label for="entry-status">
           Status
           <select id="status-filter">
             <option value="ALL">All</option>
@@ -100,7 +100,7 @@
           </select>
         </label>
 
-        <label>
+        <label for="entry-amount">
           Search
           <input id="search-filter" type="search" placeholder="Category or description" />
         </label>
@@ -131,7 +131,7 @@
         <h2 class="ledger-heading">Add Entry to the Books</h2>
         <p class="entry-helper">Submission is local preview only until onchain write is enabled.</p>
         <form id="entry-form" class="entry-form" novalidate>
-          <label>
+          <label for="entry-category">
             Type
             <select id="entry-type" name="type" required>
               <option value="">Select type</option>
@@ -141,7 +141,7 @@
             <span id="entry-type-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label>
+          <label for="entry-description">
             Status
             <select id="entry-status" name="status" required>
               <option value="">Select status</option>
@@ -151,13 +151,13 @@
             <span id="entry-status-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label>
+          <label for="entry-reference">
             Amount
             <input id="entry-amount" name="amount" type="number" min="0.01" step="0.01" required />
             <span id="entry-amount-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label>
+          <label for="entry-date">
             Category
             <input id="entry-category" name="category" type="text" required />
             <span id="entry-category-error" class="field-error" aria-live="polite"></span>
