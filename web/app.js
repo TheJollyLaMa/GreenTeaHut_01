@@ -83,7 +83,7 @@ const entryStatusEl = document.getElementById('entry-status');
 const entryAmountEl = document.getElementById('entry-amount');
 const entryCategoryEl = document.getElementById('entry-category');
 const entryDescriptionEl = document.getElementById('entry-description');
-const entryReferenceEl = document.getElementById('entry-reference');
+const entryProofEl = document.getElementById('entry-proof');
 const entryDateEl = document.getElementById('entry-date');
 
 let entries = [];
@@ -134,11 +134,11 @@ function calculateSummary(allEntries) {
     .filter((e) => e.status === STATUS_REQUEST)
     .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
-  const balance = settledRaised - settledSpent - totalRequests;
+  const balance = settledRaised - settledSpent;
   const projectedRaised = settledRaised + pendingRaised;
   const projectedSpent = settledSpent + pendingSpent;
   const projectedBalance = projectedRaised - projectedSpent - totalRequests;
-  const hasGhostBalance = pendingRaised > 0 || pendingSpent > 0;
+  const hasGhostBalance = pendingRaised > 0 || pendingSpent > 0 || totalRequests > 0;
 
   updateSummaryDisplay({
     totalRaised: formatAmount(settledRaised),
@@ -263,7 +263,16 @@ function appendAuditRecord(entry, eventType, details = {}) {
   });
 }
 
-function handleEntrySubmit(event) {
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleEntrySubmit(event) {
   event.preventDefault();
   clearFieldErrors();
 
@@ -273,7 +282,7 @@ function handleEntrySubmit(event) {
   const amount = Number(amountValue);
   const category = entryCategoryEl.value.trim();
   const description = entryDescriptionEl.value.trim();
-  const reference = entryReferenceEl.value.trim();
+  const proofFile = entryProofEl && entryProofEl.files[0] ? entryProofEl.files[0] : null;
   const date = entryDateEl.value;
 
   let hasError = false;
@@ -306,17 +315,46 @@ function handleEntrySubmit(event) {
     hasError = true;
   }
 
-  if (reference && !isValidUrl(reference)) {
-    setFieldError('reference', 'Reference URL must be a valid http/https URL.');
-    hasError = true;
-  }
-
   if (!date) {
     setFieldError('date', 'Date is required.');
     hasError = true;
   }
 
+  if (!hasError && status === STATUS_REQUEST) {
+    const settledRaised = entries
+      .filter((e) => e.type === 'INCOMING' && e.status === STATUS_SETTLED)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const settledSpent = entries
+      .filter((e) => e.type === 'OUTGOING' && e.status === STATUS_SETTLED)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const pendingRaised = entries
+      .filter((e) => e.type === 'INCOMING' && e.status === STATUS_PENDING)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const existingRequests = entries
+      .filter((e) => e.status === STATUS_REQUEST)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const maxRequestable = settledRaised - settledSpent + pendingRaised;
+    if (existingRequests + amount > maxRequestable) {
+      const remaining = Math.max(0, maxRequestable - existingRequests);
+      setFieldError(
+        'amount',
+        `Cannot request more than available funds. Maximum requestable: ${formatAmount(remaining)}.`,
+      );
+      hasError = true;
+    }
+  }
+
   if (hasError) return;
+
+  let reference = '';
+  if (proofFile) {
+    try {
+      reference = await readFileAsDataURL(proofFile);
+    } catch {
+      setFieldError('reference', 'Failed to read the proof file. Please try again.');
+      return;
+    }
+  }
 
   const entry = normalizeEntry({
     id: getNextEntryId(),
@@ -331,7 +369,7 @@ function handleEntrySubmit(event) {
 
   appendAuditRecord(entry, 'ENTRY_CREATED', {
     status,
-    referenceURI: reference,
+    proofFileName: proofFile ? proofFile.name : null,
   });
 
   entries.push(entry);
@@ -357,14 +395,42 @@ function getStatusBadge(status) {
 function createProofCell(entry) {
   const proofCell = document.createElement('td');
 
-  if (entry.reference && isValidUrl(entry.reference)) {
-    const proofLink = document.createElement('a');
-    proofLink.href = getSafeProofUrl(entry.reference);
-    proofLink.target = '_blank';
-    proofLink.rel = 'noopener noreferrer';
-    proofLink.textContent = 'View proof';
-    proofCell.appendChild(proofLink);
-    return proofCell;
+  if (entry.reference) {
+    if (entry.reference.startsWith('data:image/')) {
+      const img = document.createElement('img');
+      img.src = entry.reference;
+      img.alt = 'Proof screenshot';
+      img.style.cssText = 'height:2rem;width:auto;cursor:pointer;border-radius:0.25rem;vertical-align:middle;';
+      img.title = 'Click to view full proof';
+      img.addEventListener('click', () => {
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(`<!doctype html><html><body style="margin:0;background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh"><img src="${entry.reference}" style="max-width:100%;height:auto;" /></body></html>`);
+        }
+      });
+      proofCell.appendChild(img);
+      return proofCell;
+    }
+
+    if (entry.reference.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = entry.reference;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'View proof';
+      proofCell.appendChild(link);
+      return proofCell;
+    }
+
+    if (isValidUrl(entry.reference)) {
+      const proofLink = document.createElement('a');
+      proofLink.href = getSafeProofUrl(entry.reference);
+      proofLink.target = '_blank';
+      proofLink.rel = 'noopener noreferrer';
+      proofLink.textContent = 'View proof';
+      proofCell.appendChild(proofLink);
+      return proofCell;
+    }
   }
 
   const emptyProof = document.createElement('span');
@@ -378,36 +444,34 @@ function handleSettleEntry(entryId) {
   const entry = entries.find((item) => item.id === entryId);
   if (!entry || entry.status === STATUS_SETTLED) return;
 
-  const proofUrl = window.prompt(
-    `Settle ${entry.id} with a proof URL (bank statement, receipt, or explorer transaction link).`,
-    entry.reference || '',
-  );
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*,.pdf';
 
-  if (proofUrl === null) return;
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
 
-  const trimmedProofUrl = proofUrl.trim();
-
-  if (!trimmedProofUrl) {
-    window.alert('A valid proof URL (http/https) is required to settle an entry.');
-    return;
-  }
-
-  if (!isValidUrl(trimmedProofUrl)) {
-    window.alert('Proof URL must be a valid http/https URL.');
-    return;
-  }
-
-  entry.status = STATUS_SETTLED;
-  entry.reference = trimmedProofUrl;
-  entry.settledAt = Date.now();
-  appendAuditRecord(entry, 'ENTRY_SETTLED', {
-    status: STATUS_SETTLED,
-    referenceURI: trimmedProofUrl,
-    settledAt: entry.settledAt,
+    const reader = new FileReader();
+    reader.onload = () => {
+      entry.status = STATUS_SETTLED;
+      entry.reference = reader.result;
+      entry.settledAt = Date.now();
+      appendAuditRecord(entry, 'ENTRY_SETTLED', {
+        status: STATUS_SETTLED,
+        proofFileName: file.name,
+        settledAt: entry.settledAt,
+      });
+      calculateSummary(entries);
+      renderTable();
+    };
+    reader.onerror = () => {
+      window.alert('Failed to read the proof file. Please try again.');
+    };
+    reader.readAsDataURL(file);
   });
 
-  calculateSummary(entries);
-  renderTable();
+  fileInput.click();
 }
 
 function createActionsCell(entry) {
