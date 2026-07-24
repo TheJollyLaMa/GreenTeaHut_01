@@ -3,29 +3,50 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Green Tea Hut TheJollyLaMa/GreenTeaHut_01#1 — Public Ledger</title>
+    <title>Green Tea Hut #1 — Public Ledger</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' role='img' aria-label='Tea cup favicon' viewBox='0 0 100 100'%3E%3Ctitle%3ETea cup favicon%3C/title%3E%3Ctext y='.9em' font-size='90'%3E🍵%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header class="page-header">
-      <h1>Green Tea Hut TheJollyLaMa/GreenTeaHut_01#1 — Public Ledger</h1>
+      <h1 class="site-title">🍵 Green Tea Hut <span class="title-num">#1</span> 🌿</h1>
       <button type="button" class="wallet-button">Connect Wallet</button>
     </header>
 
     <main>
-      <section class="summary" aria-label="Financial summary">
-        <article class="card">
-          <h2>Total Raised</h2>
-          <p id="total-raised">$0.00</p>
-        </article>
-        <article class="card">
-          <h2>Total Spent</h2>
-          <p id="total-spent">$0.00</p>
-        </article>
-        <article class="card">
-          <h2>Balance</h2>
-          <p id="balance">$0.00</p>
-        </article>
+      <section class="hero" aria-label="Green Tea Hut #1 concept art">
+        <span class="bee bee-one" aria-hidden="true">🐝</span>
+        <span class="bee bee-two" aria-hidden="true">🐝</span>
+        <img
+          src="assets/images/green-tea-party-hut.png"
+          alt="Hand-drawn concept sketch of the Green Tea Party Hut #1 with cob walls, living green roof, and round windows"
+          class="hero-image"
+          width="300"
+          height="300"
+        />
+      </section>
+
+      <section class="equation-section" aria-label="Financial summary">
+        <div class="equation">
+          <div class="eq-item eq-raised">
+            <div class="eq-label">Total Raised</div>
+            <div class="eq-value" id="total-raised">Loading...</div>
+          </div>
+          <div class="eq-op" aria-hidden="true">−</div>
+          <div class="eq-item eq-spent">
+            <div class="eq-label">Total Spent</div>
+            <div class="eq-value" id="total-spent">Loading...</div>
+          </div>
+          <div class="eq-op" aria-hidden="true">=</div>
+          <div class="eq-item eq-balance">
+            <div class="eq-label">Balance</div>
+            <div class="eq-value" id="balance">Loading...</div>
+          </div>
+        </div>
+        <p class="summary-note">Source: Manual pending entry (until contract deploy)</p>
       </section>
 
       <section class="filters" aria-label="Ledger filters">
@@ -54,6 +75,7 @@
       </section>
 
       <section aria-label="Ledger entries">
+        <h2 class="ledger-heading">📜 Public Ledger</h2>
         <div class="table-wrap">
           <table>
             <thead>

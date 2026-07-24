@@ -5,30 +5,10 @@
       "date": "2026-07-23",
       "type": "INCOMING",
       "status": "PENDING",
-      "amount": 4192,
+      "amount": 4230,
       "category": "Artizen",
       "description": "Season 7 campaign allocation for Green Tea Hut #1",
       "reference": "https://artizen.fund/index/p/green-tea-hut-1?season=7"
-    },
-    {
-      "id": "L-002",
-      "date": "2026-07-10",
-      "type": "INCOMING",
-      "status": "CONFIRMED",
-      "amount": 800,
-      "category": "Community Donor",
-      "description": "Direct supporter contribution",
-      "reference": "https://example.com/proof/community-donor-001"
-    },
-    {
-      "id": "L-003",
-      "date": "2026-07-15",
-      "type": "OUTGOING",
-      "status": "CONFIRMED",
-      "amount": 325,
-      "category": "Materials",
-      "description": "Initial bamboo and hardware purchase",
-      "reference": "https://example.com/proof/materials-001"
     }
   ]
 }

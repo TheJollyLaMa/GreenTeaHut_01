@@ -18,7 +18,13 @@ function formatAmount(value) {
   return currency.format(Number(value) || 0);
 }
 
-function updateSummary(allEntries) {
+function updateSummaryDisplay(summary) {
+  totalRaisedEl.textContent = summary.totalRaised;
+  totalSpentEl.textContent = summary.totalSpent;
+  balanceEl.textContent = summary.balance;
+}
+
+function calculateSummary(allEntries) {
   const totalRaised = allEntries
     .filter((entry) => entry.type === 'INCOMING')
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
@@ -27,9 +33,11 @@ function updateSummary(allEntries) {
     .filter((entry) => entry.type === 'OUTGOING')
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
 
-  totalRaisedEl.textContent = formatAmount(totalRaised);
-  totalSpentEl.textContent = formatAmount(totalSpent);
-  balanceEl.textContent = formatAmount(totalRaised - totalSpent);
+  updateSummaryDisplay({
+    totalRaised: formatAmount(totalRaised),
+    totalSpent: formatAmount(totalSpent),
+    balance: formatAmount(totalRaised - totalSpent),
+  });
 }
 
 function getFilteredEntries() {
@@ -55,6 +63,7 @@ function getSafeProofUrl(url) {
       return parsed.toString();
     }
   } catch (error) {}
+
   return '#';
 }
 
@@ -104,7 +113,7 @@ async function init() {
     const data = await response.json();
     entries = Array.isArray(data.entries) ? data.entries : [];
 
-    updateSummary(entries);
+    calculateSummary(entries);
     renderTable();
   } catch (error) {
     ledgerBody.innerHTML =
