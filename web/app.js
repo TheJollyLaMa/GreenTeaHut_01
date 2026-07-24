@@ -12,7 +12,11 @@ const aboutSlidesLink = document.getElementById('about-slides-link');
 function getPublishedSlidesOpenUrl(embedUrl) {
   try {
     const parsed = new URL(embedUrl);
-    parsed.pathname = parsed.pathname.replace(/\/embed$/, '/pub');
+    const pathSegments = parsed.pathname.split('/');
+    if (pathSegments[pathSegments.length - 1] === 'embed') {
+      pathSegments[pathSegments.length - 1] = 'pub';
+      parsed.pathname = pathSegments.join('/');
+    }
     return parsed.toString();
   } catch (error) {
     console.warn(
