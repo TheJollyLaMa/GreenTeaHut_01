@@ -46,7 +46,7 @@ function renderLedgerTotals(allEntries) {
   });
 }
 
-function showPendingSummary() {
+function renderPendingSummary() {
   renderSummary(pendingSummary);
 }
 
@@ -113,7 +113,7 @@ function renderTable() {
 }
 
 async function init() {
-  showPendingSummary();
+  renderPendingSummary();
 
   try {
     const response = await fetch('../data/seed-ledger.json');
