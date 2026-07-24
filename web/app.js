@@ -41,8 +41,17 @@ const balanceEl = document.getElementById('balance');
 const typeFilterEl = document.getElementById('type-filter');
 const statusFilterEl = document.getElementById('status-filter');
 const searchFilterEl = document.getElementById('search-filter');
+const entryFormEl = document.getElementById('entry-form');
+const entryTypeEl = document.getElementById('entry-type');
+const entryStatusEl = document.getElementById('entry-status');
+const entryAmountEl = document.getElementById('entry-amount');
+const entryCategoryEl = document.getElementById('entry-category');
+const entryDescriptionEl = document.getElementById('entry-description');
+const entryReferenceEl = document.getElementById('entry-reference');
+const entryDateEl = document.getElementById('entry-date');
 
 let entries = [];
+let nextEntrySequence = 1;
 
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -103,6 +112,123 @@ function getSafeProofUrl(url) {
   return '#';
 }
 
+function isValidUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch (error) {
+    return false;
+  }
+}
+
+function calculateNextEntrySequence(allEntries) {
+  const maxId = allEntries.reduce((max, entry) => {
+    const match = typeof entry.id === 'string' ? entry.id.match(/^L-(\d+)$/) : null;
+    if (!match) return max;
+    return Math.max(max, Number(match[1]));
+  }, 0);
+
+  return maxId + 1;
+}
+
+function getNextEntryId() {
+  const nextId = `L-${String(nextEntrySequence).padStart(3, '0')}`;
+  nextEntrySequence += 1;
+  return nextId;
+}
+
+function setDefaultEntryDate() {
+  if (entryDateEl) {
+    entryDateEl.value = new Date().toISOString().slice(0, 10);
+  }
+}
+
+function setFieldError(fieldName, message) {
+  const errorEl = document.getElementById(`entry-${fieldName}-error`);
+  if (errorEl) errorEl.textContent = message;
+}
+
+function clearFieldErrors() {
+  ['type', 'status', 'amount', 'category', 'description', 'reference', 'date'].forEach((fieldName) => {
+    setFieldError(fieldName, '');
+  });
+}
+
+function handleEntrySubmit(event) {
+  event.preventDefault();
+  clearFieldErrors();
+
+  const type = entryTypeEl.value;
+  const status = entryStatusEl.value;
+  const amountValue = entryAmountEl.value.trim();
+  const amount = Number(amountValue);
+  const category = entryCategoryEl.value.trim();
+  const description = entryDescriptionEl.value.trim();
+  const reference = entryReferenceEl.value.trim();
+  const date = entryDateEl.value;
+
+  let hasError = false;
+
+  if (!type) {
+    setFieldError('type', 'Type is required.');
+    hasError = true;
+  }
+
+  if (!status) {
+    setFieldError('status', 'Status is required.');
+    hasError = true;
+  }
+
+  if (!amountValue) {
+    setFieldError('amount', 'Amount is required.');
+    hasError = true;
+  } else if (Number.isNaN(amount) || amount < 0.01) {
+    setFieldError('amount', 'Amount must be a number greater than or equal to 0.01.');
+    hasError = true;
+  }
+
+  if (!category) {
+    setFieldError('category', 'Category is required.');
+    hasError = true;
+  }
+
+  if (!description) {
+    setFieldError('description', 'Description is required.');
+    hasError = true;
+  }
+
+  if (!reference) {
+    setFieldError('reference', 'Reference URL is required.');
+    hasError = true;
+  } else if (!isValidUrl(reference)) {
+    setFieldError('reference', 'Reference URL must be a valid http/https URL.');
+    hasError = true;
+  }
+
+  if (!date) {
+    setFieldError('date', 'Date is required.');
+    hasError = true;
+  }
+
+  if (hasError) return;
+
+  entries.push({
+    id: getNextEntryId(),
+    date,
+    type,
+    status,
+    amount,
+    category,
+    description,
+    reference,
+  });
+
+  calculateSummary(entries);
+  renderTable();
+  entryFormEl.reset();
+  setDefaultEntryDate();
+}
+
 function renderTable() {
   const filtered = getFilteredEntries();
 
@@ -148,6 +274,7 @@ async function init() {
 
     const data = await response.json();
     entries = Array.isArray(data.entries) ? data.entries : [];
+    nextEntrySequence = calculateNextEntrySequence(entries);
 
     calculateSummary(entries);
     renderTable();
@@ -161,5 +288,10 @@ async function init() {
 [typeFilterEl, statusFilterEl, searchFilterEl].forEach((el) => {
   el.addEventListener('input', renderTable);
 });
+
+if (entryFormEl) {
+  setDefaultEntryDate();
+  entryFormEl.addEventListener('submit', handleEntrySubmit);
+}
 
 init();

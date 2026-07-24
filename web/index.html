@@ -81,8 +81,48 @@
         <p class="summary-note">Source: Manual pending entry (until contract deploy)</p>
       </section>
 
+      <section class="roadmap-section" aria-label="Project Roadmap">
+        <h2 class="ledger-heading">Project Roadmap</h2>
+        <div class="roadmap-track-wrap">
+          <ol class="roadmap-track">
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Idea</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Initial Outreach</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Initial Fund Seed</span>
+            </li>
+            <li class="roadmap-step is-current" aria-current="step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Materials &amp; Equipment Gathering</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Building Phase 1</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Building Phase 2</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Building Phase 3</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Operational</span>
+            </li>
+          </ol>
+        </div>
+      </section>
+
       <section class="filters" aria-label="Ledger filters">
-        <label>
+        <label for="type-filter">
           Type
           <select id="type-filter">
             <option value="ALL">All</option>
@@ -91,16 +131,17 @@
           </select>
         </label>
 
-        <label>
+        <label for="status-filter">
           Status
           <select id="status-filter">
             <option value="ALL">All</option>
             <option value="PENDING">Pending</option>
             <option value="CONFIRMED">Confirmed</option>
+            <option value="REQUEST">Request</option>
           </select>
         </label>
 
-        <label>
+        <label for="search-filter">
           Search
           <input id="search-filter" type="search" placeholder="Category or description" />
         </label>
@@ -126,6 +167,66 @@
           </table>
         </div>
       </section>
+
+      <section class="entry-section" aria-label="Add Entry to the Books">
+        <h2 class="ledger-heading">Add Entry to the Books</h2>
+        <p class="entry-helper">Submission is local preview only until onchain write is enabled.</p>
+        <form id="entry-form" class="entry-form" novalidate>
+          <label for="entry-type">
+            Type
+            <select id="entry-type" name="type" required>
+              <option value="">Select type</option>
+              <option value="INCOMING">INCOMING</option>
+              <option value="OUTGOING">OUTGOING</option>
+            </select>
+            <span id="entry-type-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label for="entry-status">
+            Status
+            <select id="entry-status" name="status" required>
+              <option value="">Select status</option>
+              <option value="PENDING">PENDING</option>
+              <option value="CONFIRMED">CONFIRMED</option>
+              <option value="REQUEST">REQUEST</option>
+            </select>
+            <span id="entry-status-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label for="entry-amount">
+            Amount
+            <input id="entry-amount" name="amount" type="number" min="0.01" step="0.01" required />
+            <span id="entry-amount-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label for="entry-category">
+            Category
+            <input id="entry-category" name="category" type="text" required />
+            <span id="entry-category-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label for="entry-description">
+            Description
+            <input id="entry-description" name="description" type="text" required />
+            <span id="entry-description-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label for="entry-reference">
+            Reference URL
+            <input id="entry-reference" name="reference" type="url" required />
+            <span id="entry-reference-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <label for="entry-date">
+            Date
+            <input id="entry-date" name="date" type="date" required />
+            <span id="entry-date-error" class="field-error" aria-live="polite"></span>
+          </label>
+
+          <button type="submit" class="entry-submit">Add Entry</button>
+        </form>
+      </section>
+
     </main>
 
     <script src="app.js"></script>
