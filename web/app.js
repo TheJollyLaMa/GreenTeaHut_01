@@ -84,6 +84,8 @@ const entryDateEl = document.getElementById('entry-date');
 
 let entries = [];
 let nextEntrySequence = 1;
+const STATUS_PENDING = 'PENDING';
+const STATUS_CONFIRMED = 'CONFIRMED';
 
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -153,6 +155,16 @@ function isValidUrl(url) {
   }
 }
 
+function normalizeEntry(entry) {
+  return {
+    ...entry,
+    status: entry.status === STATUS_CONFIRMED ? STATUS_CONFIRMED : STATUS_PENDING,
+    reference: typeof entry.reference === 'string' ? entry.reference : '',
+    settledAt: Number(entry.settledAt) || 0,
+    auditTrail: Array.isArray(entry.auditTrail) ? entry.auditTrail : [],
+  };
+}
+
 function calculateNextEntrySequence(allEntries) {
   const maxId = allEntries.reduce((max, entry) => {
     const match = typeof entry.id === 'string' ? entry.id.match(/^L-(\d+)$/) : null;
@@ -186,12 +198,24 @@ function clearFieldErrors() {
   });
 }
 
+function appendAuditRecord(entry, eventType, details = {}) {
+  if (!Array.isArray(entry.auditTrail)) {
+    entry.auditTrail = [];
+  }
+
+  entry.auditTrail.push({
+    eventType,
+    timestamp: new Date().toISOString(),
+    ...details,
+  });
+}
+
 function handleEntrySubmit(event) {
   event.preventDefault();
   clearFieldErrors();
 
   const type = entryTypeEl.value;
-  const status = entryStatusEl.value;
+  const status = entryStatusEl.value || STATUS_PENDING;
   const amountValue = entryAmountEl.value.trim();
   const amount = Number(amountValue);
   const category = entryCategoryEl.value.trim();
@@ -229,10 +253,7 @@ function handleEntrySubmit(event) {
     hasError = true;
   }
 
-  if (!reference) {
-    setFieldError('reference', 'Reference URL is required.');
-    hasError = true;
-  } else if (!isValidUrl(reference)) {
+  if (reference && !isValidUrl(reference)) {
     setFieldError('reference', 'Reference URL must be a valid http/https URL.');
     hasError = true;
   }
@@ -244,7 +265,7 @@ function handleEntrySubmit(event) {
 
   if (hasError) return;
 
-  entries.push({
+  const entry = normalizeEntry({
     id: getNextEntryId(),
     date,
     type,
@@ -255,10 +276,101 @@ function handleEntrySubmit(event) {
     reference,
   });
 
+  appendAuditRecord(entry, 'ENTRY_CREATED', {
+    status,
+    referenceURI: reference,
+  });
+
+  entries.push(entry);
+
   calculateSummary(entries);
   renderTable();
   entryFormEl.reset();
   setDefaultEntryDate();
+}
+
+function getStatusBadge(status) {
+  const badge = document.createElement('span');
+  const isConfirmed = status === STATUS_CONFIRMED;
+  badge.className = `status-badge ${isConfirmed ? 'status-confirmed' : 'status-pending'}`;
+  badge.textContent = isConfirmed ? STATUS_CONFIRMED : STATUS_PENDING;
+  return badge;
+}
+
+function createProofCell(entry) {
+  const proofCell = document.createElement('td');
+
+  if (entry.reference && isValidUrl(entry.reference)) {
+    const proofLink = document.createElement('a');
+    proofLink.href = getSafeProofUrl(entry.reference);
+    proofLink.target = '_blank';
+    proofLink.rel = 'noopener noreferrer';
+    proofLink.textContent = 'View proof';
+    proofCell.appendChild(proofLink);
+    return proofCell;
+  }
+
+  const emptyProof = document.createElement('span');
+  emptyProof.className = 'muted-text';
+  emptyProof.textContent = 'No proof yet';
+  proofCell.appendChild(emptyProof);
+  return proofCell;
+}
+
+function handleConfirmEntry(entryId) {
+  const entry = entries.find((item) => item.id === entryId);
+  if (!entry || entry.status !== STATUS_PENDING) return;
+
+  const proofUrl = window.prompt(
+    `Confirm ${entry.id} with a proof URL (bank statement, receipt, or explorer transaction link).`,
+    entry.reference || '',
+  );
+
+  if (proofUrl === null) return;
+
+  const trimmedProofUrl = proofUrl.trim();
+
+  if (!trimmedProofUrl) {
+    window.alert('A proof URL is required to confirm an entry.');
+    return;
+  }
+
+  if (!isValidUrl(trimmedProofUrl)) {
+    window.alert('Proof URL must be a valid http/https URL.');
+    return;
+  }
+
+  entry.status = STATUS_CONFIRMED;
+  entry.reference = trimmedProofUrl;
+  entry.settledAt = Date.now();
+  appendAuditRecord(entry, 'ENTRY_CONFIRMED', {
+    status: STATUS_CONFIRMED,
+    referenceURI: trimmedProofUrl,
+    settledAt: entry.settledAt,
+  });
+
+  renderTable();
+}
+
+function createActionsCell(entry) {
+  const actionsCell = document.createElement('td');
+
+  if (entry.status !== STATUS_PENDING) {
+    const confirmedLabel = document.createElement('span');
+    confirmedLabel.className = 'muted-text';
+    confirmedLabel.textContent = 'Confirmed';
+    actionsCell.appendChild(confirmedLabel);
+    return actionsCell;
+  }
+
+  const confirmButton = document.createElement('button');
+  confirmButton.type = 'button';
+  confirmButton.className = 'table-action';
+  confirmButton.textContent = 'Confirm/Settle';
+  confirmButton.addEventListener('click', () => handleConfirmEntry(entry.id));
+  actionsCell.appendChild(confirmButton);
+
+  return actionsCell;
 }
 
 function renderTable() {
@@ -268,30 +380,24 @@ function renderTable() {
 
   filtered.forEach((entry) => {
     const row = document.createElement('tr');
-    const cells = [
-      entry.id,
-      entry.date,
-      entry.type,
-      entry.status,
-      formatAmount(entry.amount),
-      entry.category,
-      entry.description,
-    ];
-
-    cells.forEach((value) => {
+    [entry.id, entry.date, entry.type].forEach((value) => {
       const cell = document.createElement('td');
       cell.textContent = value;
       row.appendChild(cell);
     });
 
-    const proofCell = document.createElement('td');
-    const proofLink = document.createElement('a');
-    proofLink.href = getSafeProofUrl(entry.reference);
-    proofLink.target = '_blank';
-    proofLink.rel = 'noopener noreferrer';
-    proofLink.textContent = 'Proof';
-    proofCell.appendChild(proofLink);
-    row.appendChild(proofCell);
+    const statusCell = document.createElement('td');
+    statusCell.appendChild(getStatusBadge(entry.status));
+    row.appendChild(statusCell);
+
+    [formatAmount(entry.amount), entry.category, entry.description].forEach((value) => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+
+    row.appendChild(createProofCell(entry));
+    row.appendChild(createActionsCell(entry));
 
     ledgerBody.appendChild(row);
   });
@@ -305,14 +411,14 @@ async function init() {
     }
 
     const data = await response.json();
-    entries = Array.isArray(data.entries) ? data.entries : [];
+    entries = Array.isArray(data.entries) ? data.entries.map(normalizeEntry) : [];
     nextEntrySequence = calculateNextEntrySequence(entries);
 
     calculateSummary(entries);
     renderTable();
   } catch (error) {
     ledgerBody.innerHTML =
-      '<tr><td colspan="8">Unable to load ledger data. Please check your connection and refresh the page.</td></tr>';
+      '<tr><td colspan="9">Unable to load ledger data. Please check your connection and refresh the page.</td></tr>';
     console.error(error);
   }
 }

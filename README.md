@@ -15,3 +15,8 @@ Project funding and spending are tracked alongside milestone progress and displa
 2. Traceable spending by milestone
 3. Public proof links (receipts/photos/docs)
 4. Ongoing monthly updates
+
+### Settlement flow
+- New ledger entries begin as `PENDING`.
+- Entries move to `CONFIRMED` once a proof/reference URL is available.
+- Contract logic for the pending → confirmed flow lives in `contracts/ProjectLedger.sol`.

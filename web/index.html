@@ -89,7 +89,7 @@
             <div class="eq-value" id="balance">Loading...</div>
           </div>
         </div>
-        <p class="summary-note">Source: Manual pending entry (until contract deploy)</p>
+        <p class="summary-note">Source: Manual preview ledger with pending → confirmed settlement flow</p>
       </section>
 
       <section class="roadmap-section" aria-label="Project Roadmap">
@@ -148,7 +148,6 @@
             <option value="ALL">All</option>
             <option value="PENDING">Pending</option>
             <option value="CONFIRMED">Confirmed</option>
-            <option value="REQUEST">Request</option>
           </select>
         </label>
 
@@ -172,6 +171,7 @@
                 <th>Category</th>
                 <th>Description</th>
                 <th>Proof</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="ledger-body"></tbody>
@@ -181,7 +181,7 @@
 
       <section class="entry-section" aria-label="Add Entry to the Books">
         <h2 class="ledger-heading">Add Entry to the Books</h2>
-        <p class="entry-helper">Submission is local preview only until onchain write is enabled.</p>
+        <p class="entry-helper">New manual entries start as PENDING. Add proof later when you confirm settlement.</p>
         <form id="entry-form" class="entry-form" novalidate>
           <label for="entry-type">
             Type
@@ -195,12 +195,8 @@
 
           <label for="entry-status">
             Status
-            <select id="entry-status" name="status" required>
-              <option value="">Select status</option>
-              <option value="PENDING">PENDING</option>
-              <option value="CONFIRMED">CONFIRMED</option>
-              <option value="REQUEST">REQUEST</option>
-            </select>
+            <input id="entry-status" name="status" type="text" value="PENDING" readonly />
+            <span class="field-note">Manual/off-chain entries are created as PENDING and confirmed after proof is available.</span>
             <span id="entry-status-error" class="field-error" aria-live="polite"></span>
           </label>
 
@@ -223,8 +219,8 @@
           </label>
 
           <label for="entry-reference">
-            Reference URL
-            <input id="entry-reference" name="reference" type="url" required />
+            Proof URL (optional until confirmed)
+            <input id="entry-reference" name="reference" type="url" />
             <span id="entry-reference-error" class="field-error" aria-live="polite"></span>
           </label>
 
@@ -234,7 +230,7 @@
             <span id="entry-date-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <button type="submit" class="entry-submit">Add Entry</button>
+          <button type="submit" class="entry-submit">Add Pending Entry</button>
         </form>
       </section>
 
