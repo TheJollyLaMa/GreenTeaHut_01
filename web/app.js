@@ -105,6 +105,7 @@ const entryAmountEl = document.getElementById('entry-amount');
 const entryCategoryEl = document.getElementById('entry-category');
 const entryDescriptionEl = document.getElementById('entry-description');
 const entryProofEl = document.getElementById('entry-proof');
+const entryFormControls = entryFormEl ? Array.from(entryFormEl.elements) : [];
 const walletButtonEl = document.querySelector('.wallet-button');
 const walletStatusEl = document.getElementById('wallet-status');
 const txStatusEl = document.getElementById('tx-status');
@@ -201,7 +202,7 @@ function clearFieldErrors() {
 
 function setFormEnabled(enabled) {
   if (!entryFormEl) return;
-  Array.from(entryFormEl.elements).forEach((element) => {
+  entryFormControls.forEach((element) => {
     element.disabled = !enabled;
   });
 }
@@ -597,11 +598,14 @@ function parseSubmissionValues() {
   if (!amountValue) {
     setFieldError('amount', 'Amount is required.');
     hasError = true;
-  } else if (Number.isNaN(amount) || amount < 1) {
-    setFieldError('amount', 'Amount must be a number greater than or equal to 1.');
+  } else if (Number.isNaN(amount)) {
+    setFieldError('amount', 'Amount must be a valid number.');
     hasError = true;
   } else if (!Number.isInteger(amount)) {
     setFieldError('amount', 'Amount must be a whole number.');
+    hasError = true;
+  } else if (amount < 1) {
+    setFieldError('amount', 'Amount must be a number greater than or equal to 1.');
     hasError = true;
   }
 
