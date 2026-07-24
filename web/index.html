@@ -81,6 +81,46 @@
         <p class="summary-note">Source: Manual pending entry (until contract deploy)</p>
       </section>
 
+      <section class="roadmap-section" aria-label="Project Roadmap">
+        <h2 class="ledger-heading">Project Roadmap</h2>
+        <div class="roadmap-track-wrap">
+          <ol class="roadmap-track">
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Idea</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Initial Outreach</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Initial Fund Seed</span>
+            </li>
+            <li class="roadmap-step is-current" aria-current="step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Materials &amp; Equipment Gathering</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Building Phase 1</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Building Phase 2</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Building Phase 3</span>
+            </li>
+            <li class="roadmap-step">
+              <span class="roadmap-point" aria-hidden="true"></span>
+              <span class="roadmap-label">Operational</span>
+            </li>
+          </ol>
+        </div>
+      </section>
+
       <section class="filters" aria-label="Ledger filters">
         <label for="type-filter">
           Type
@@ -97,6 +137,7 @@
             <option value="ALL">All</option>
             <option value="PENDING">Pending</option>
             <option value="CONFIRMED">Confirmed</option>
+            <option value="REQUEST">Request</option>
           </select>
         </label>
 
@@ -147,6 +188,7 @@
               <option value="">Select status</option>
               <option value="PENDING">PENDING</option>
               <option value="CONFIRMED">CONFIRMED</option>
+              <option value="REQUEST">REQUEST</option>
             </select>
             <span id="entry-status-error" class="field-error" aria-live="polite"></span>
           </label>
@@ -185,45 +227,6 @@
         </form>
       </section>
 
-      <section class="roadmap-section" aria-label="Project Roadmap">
-        <h2 class="ledger-heading">Project Roadmap</h2>
-        <div class="roadmap-track-wrap">
-          <ol class="roadmap-track">
-            <li class="roadmap-step">
-              <span class="roadmap-point" aria-hidden="true"></span>
-              <span class="roadmap-label">Idea</span>
-            </li>
-            <li class="roadmap-step">
-              <span class="roadmap-point" aria-hidden="true"></span>
-              <span class="roadmap-label">Initial Outreach</span>
-            </li>
-            <li class="roadmap-step">
-              <span class="roadmap-point" aria-hidden="true"></span>
-              <span class="roadmap-label">Initial Fund Seed</span>
-            </li>
-            <li class="roadmap-step">
-              <span class="roadmap-point" aria-hidden="true"></span>
-              <span class="roadmap-label">Materials &amp; Equipment Gathering</span>
-            </li>
-            <li class="roadmap-step is-current" aria-current="step">
-              <span class="roadmap-point" aria-hidden="true"></span>
-              <span class="roadmap-label">Building Phase 1</span>
-            </li>
-            <li class="roadmap-step">
-              <span class="roadmap-point" aria-hidden="true"></span>
-              <span class="roadmap-label">Building Phase 2</span>
-            </li>
-            <li class="roadmap-step">
-              <span class="roadmap-point" aria-hidden="true"></span>
-              <span class="roadmap-label">Building Phase 3</span>
-            </li>
-            <li class="roadmap-step">
-              <span class="roadmap-point" aria-hidden="true"></span>
-              <span class="roadmap-label">Operational</span>
-            </li>
-          </ol>
-        </div>
-      </section>
     </main>
 
     <script src="app.js"></script>
