@@ -70,11 +70,16 @@ const ledgerBody = document.getElementById('ledger-body');
 const totalRaisedEl = document.getElementById('total-raised');
 const totalSpentEl = document.getElementById('total-spent');
 const balanceEl = document.getElementById('balance');
+const pendingRaisedEl = document.getElementById('pending-raised');
+const pendingSpentEl = document.getElementById('pending-spent');
+const requestSpentEl = document.getElementById('request-spent');
+const pendingBalanceEl = document.getElementById('pending-balance');
 const typeFilterEl = document.getElementById('type-filter');
 const statusFilterEl = document.getElementById('status-filter');
 const searchFilterEl = document.getElementById('search-filter');
 const entryFormEl = document.getElementById('entry-form');
 const entryTypeEl = document.getElementById('entry-type');
+const entryStatusEl = document.getElementById('entry-status');
 const entryAmountEl = document.getElementById('entry-amount');
 const entryCategoryEl = document.getElementById('entry-category');
 const entryDescriptionEl = document.getElementById('entry-description');
@@ -84,7 +89,8 @@ const entryDateEl = document.getElementById('entry-date');
 let entries = [];
 let nextEntrySequence = 1;
 const STATUS_PENDING = 'PENDING';
-const STATUS_CONFIRMED = 'CONFIRMED';
+const STATUS_SETTLED = 'SETTLED';
+const STATUS_REQUEST = 'REQUEST';
 
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -100,21 +106,48 @@ function updateSummaryDisplay(summary) {
   totalRaisedEl.textContent = summary.totalRaised;
   totalSpentEl.textContent = summary.totalSpent;
   balanceEl.textContent = summary.balance;
+
+  if (pendingRaisedEl) pendingRaisedEl.textContent = summary.pendingRaised;
+  if (pendingSpentEl) pendingSpentEl.textContent = summary.pendingSpent;
+  if (requestSpentEl) requestSpentEl.textContent = summary.totalRequests;
+  if (pendingBalanceEl) pendingBalanceEl.textContent = summary.pendingBalance;
 }
 
 function calculateSummary(allEntries) {
-  const totalRaised = allEntries
-    .filter((entry) => entry.type === 'INCOMING')
-    .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const settledRaised = allEntries
+    .filter((e) => e.type === 'INCOMING' && e.status === STATUS_SETTLED)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
-  const totalSpent = allEntries
-    .filter((entry) => entry.type === 'OUTGOING')
-    .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const pendingRaised = allEntries
+    .filter((e) => e.type === 'INCOMING' && e.status === STATUS_PENDING)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const settledSpent = allEntries
+    .filter((e) => e.type === 'OUTGOING' && e.status === STATUS_SETTLED)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const pendingSpent = allEntries
+    .filter((e) => e.type === 'OUTGOING' && e.status === STATUS_PENDING)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const totalRequests = allEntries
+    .filter((e) => e.status === STATUS_REQUEST)
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const balance = settledRaised - settledSpent - totalRequests;
+  const projectedRaised = settledRaised + pendingRaised;
+  const projectedSpent = settledSpent + pendingSpent;
+  const projectedBalance = projectedRaised - projectedSpent - totalRequests;
+  const hasGhostBalance = pendingRaised > 0 || pendingSpent > 0;
 
   updateSummaryDisplay({
-    totalRaised: formatAmount(totalRaised),
-    totalSpent: formatAmount(totalSpent),
-    balance: formatAmount(totalRaised - totalSpent),
+    totalRaised: formatAmount(settledRaised),
+    pendingRaised: pendingRaised > 0 ? `(${formatAmount(projectedRaised)})` : '',
+    totalSpent: formatAmount(settledSpent),
+    pendingSpent: pendingSpent > 0 ? `(${formatAmount(projectedSpent)})` : '',
+    totalRequests: totalRequests > 0 ? `(${formatAmount(totalRequests)})` : '',
+    balance: formatAmount(balance),
+    pendingBalance: hasGhostBalance ? `(${formatAmount(projectedBalance)})` : '',
   });
 }
 
@@ -155,13 +188,13 @@ function isValidUrl(url) {
 }
 
 function normalizeStatus(status) {
-  if (status === STATUS_PENDING || status === STATUS_CONFIRMED) {
+  if (status === STATUS_PENDING || status === STATUS_SETTLED || status === STATUS_REQUEST) {
     return status;
   }
 
   if (typeof status === 'string' && status.length > 0) {
     console.warn(
-      `Unknown ledger status "${status}" found. Valid statuses are ${STATUS_PENDING} or ${STATUS_CONFIRMED}. Defaulting to ${STATUS_PENDING}.`,
+      `Unknown ledger status "${status}" found. Valid statuses are ${STATUS_PENDING}, ${STATUS_SETTLED}, or ${STATUS_REQUEST}. Defaulting to ${STATUS_PENDING}.`,
     );
   }
 
@@ -235,7 +268,7 @@ function handleEntrySubmit(event) {
   clearFieldErrors();
 
   const type = entryTypeEl.value;
-  const status = STATUS_PENDING;
+  const status = entryStatusEl ? entryStatusEl.value : STATUS_PENDING;
   const amountValue = entryAmountEl.value.trim();
   const amount = Number(amountValue);
   const category = entryCategoryEl.value.trim();
@@ -311,9 +344,13 @@ function handleEntrySubmit(event) {
 
 function getStatusBadge(status) {
   const badge = document.createElement('span');
-  const isConfirmed = status === STATUS_CONFIRMED;
-  badge.className = `status-badge ${isConfirmed ? 'status-confirmed' : 'status-pending'}`;
-  badge.textContent = isConfirmed ? STATUS_CONFIRMED : STATUS_PENDING;
+  const classMap = {
+    [STATUS_SETTLED]: 'status-settled',
+    [STATUS_PENDING]: 'status-pending',
+    [STATUS_REQUEST]: 'status-request',
+  };
+  badge.className = `status-badge ${classMap[status] || 'status-pending'}`;
+  badge.textContent = status || STATUS_PENDING;
   return badge;
 }
 
@@ -337,12 +374,12 @@ function createProofCell(entry) {
   return proofCell;
 }
 
-function handleConfirmEntry(entryId) {
+function handleSettleEntry(entryId) {
   const entry = entries.find((item) => item.id === entryId);
-  if (!entry || entry.status !== STATUS_PENDING) return;
+  if (!entry || entry.status === STATUS_SETTLED) return;
 
   const proofUrl = window.prompt(
-    `Confirm ${entry.id} with a proof URL (bank statement, receipt, or explorer transaction link).`,
+    `Settle ${entry.id} with a proof URL (bank statement, receipt, or explorer transaction link).`,
     entry.reference || '',
   );
 
@@ -351,7 +388,7 @@ function handleConfirmEntry(entryId) {
   const trimmedProofUrl = proofUrl.trim();
 
   if (!trimmedProofUrl) {
-    window.alert('A valid proof URL (http/https) is required to confirm an entry.');
+    window.alert('A valid proof URL (http/https) is required to settle an entry.');
     return;
   }
 
@@ -360,35 +397,36 @@ function handleConfirmEntry(entryId) {
     return;
   }
 
-  entry.status = STATUS_CONFIRMED;
+  entry.status = STATUS_SETTLED;
   entry.reference = trimmedProofUrl;
   entry.settledAt = Date.now();
-  appendAuditRecord(entry, 'ENTRY_CONFIRMED', {
-    status: STATUS_CONFIRMED,
+  appendAuditRecord(entry, 'ENTRY_SETTLED', {
+    status: STATUS_SETTLED,
     referenceURI: trimmedProofUrl,
     settledAt: entry.settledAt,
   });
 
+  calculateSummary(entries);
   renderTable();
 }
 
 function createActionsCell(entry) {
   const actionsCell = document.createElement('td');
 
-  if (entry.status !== STATUS_PENDING) {
-    const confirmedLabel = document.createElement('span');
-    confirmedLabel.className = 'muted-text';
-    confirmedLabel.textContent = 'Confirmed';
-    actionsCell.appendChild(confirmedLabel);
+  if (entry.status === STATUS_SETTLED) {
+    const settledLabel = document.createElement('span');
+    settledLabel.className = 'muted-text';
+    settledLabel.textContent = 'Settled';
+    actionsCell.appendChild(settledLabel);
     return actionsCell;
   }
 
-  const confirmButton = document.createElement('button');
-  confirmButton.type = 'button';
-  confirmButton.className = 'table-action';
-  confirmButton.textContent = 'Confirm';
-  confirmButton.addEventListener('click', () => handleConfirmEntry(entry.id));
-  actionsCell.appendChild(confirmButton);
+  const settleButton = document.createElement('button');
+  settleButton.type = 'button';
+  settleButton.className = 'table-action';
+  settleButton.textContent = 'Settle';
+  settleButton.addEventListener('click', () => handleSettleEntry(entry.id));
+  actionsCell.appendChild(settleButton);
 
   return actionsCell;
 }
