@@ -12,9 +12,41 @@
   </head>
   <body>
     <header class="page-header">
-      <h1 class="site-title">🍵 Green Tea Hut <span class="title-num">#1</span> 🌿</h1>
-      <button type="button" class="wallet-button">Connect Wallet</button>
+      <h1
+        class="site-title"
+        id="about-trigger"
+        role="button"
+        tabindex="0"
+        aria-haspopup="dialog"
+        title="About Green Tea Hut #1"
+      >🍵 Green Tea Hut <span class="title-num">#1</span> 🌿</h1>
+      <button type="button" class="wallet-button" aria-label="Connect MetaMask wallet">
+        <img src="assets/images/MetaMask.png" alt="" class="wallet-icon" />
+      </button>
     </header>
+
+    <!-- About modal -->
+    <div
+      id="about-modal"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="about-modal-title"
+      hidden
+    >
+      <div class="modal-box">
+        <button type="button" class="modal-close" aria-label="Close About modal">✕</button>
+        <h2 id="about-modal-title" class="modal-title">About Green Tea Hut #1</h2>
+        <p>About content coming soon.</p>
+        <p>
+          <a
+            href="https://github.com/TheJollyLaMa/GreenTeaHut_01"
+            target="_blank"
+            rel="noopener noreferrer"
+          >View on GitHub →</a>
+        </p>
+      </div>
+    </div>
 
     <main>
       <section class="hero" aria-label="Green Tea Hut #1 concept art">
