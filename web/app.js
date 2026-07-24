@@ -181,7 +181,6 @@ function setTxStatus(message, type = 'info', hash = '') {
     link.rel = 'noopener noreferrer';
     link.textContent = 'View transaction';
     txStatusEl.appendChild(link);
-    return;
   }
 }
 
@@ -492,6 +491,7 @@ async function fetchEntriesFromContract() {
   const pageSize = LEDGER_CONFIG.entryPageSize;
   const loaded = [];
 
+  // Keep requests batched to avoid overloading public RPC endpoints.
   for (let start = 1; start <= totalEntries; start += pageSize) {
     const end = Math.min(totalEntries, start + pageSize - 1);
     const ids = [];
