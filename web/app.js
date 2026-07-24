@@ -1,7 +1,7 @@
 // --- About modal ---
 // Must be a Google Slides "Publish to web" embed URL (not edit URL).
 const ABOUT_SLIDES_EMBED_URL =
-  'https://docs.google.com/presentation/d/e/2PACX-1vSryqtYkNSuw7wgg8m5Vdi1oaBRN9gIIO-LXlaOWMzHJFc8v9nPeXAbKkKtcbS2n8BOwPBaJjPFy-uv/embed?start=false&loop=false&delayms=3000';
+  'https://docs.google.com/presentation/d/e/2PACX-1vTraXc7uqbvK62XYUSvtLul29KxMW3zTluA_wCIhTNML52gSJgnkFy04m7tiECySan_rU-qwvwd8HqT/pubembed?start=true&loop=true&delayms=5000';
 
 const aboutModal = document.getElementById('about-modal');
 const aboutTrigger = document.getElementById('about-trigger');
