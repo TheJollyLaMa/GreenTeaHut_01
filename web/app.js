@@ -18,13 +18,13 @@ function formatAmount(value) {
   return currency.format(Number(value) || 0);
 }
 
-function renderSummary(summary) {
+function updateSummaryDisplay(summary) {
   totalRaisedEl.textContent = summary.totalRaised;
   totalSpentEl.textContent = summary.totalSpent;
   balanceEl.textContent = summary.balance;
 }
 
-function updateSummaryFromEntries(allEntries) {
+function calculateSummary(allEntries) {
   const totalRaised = allEntries
     .filter((entry) => entry.type === 'INCOMING')
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
@@ -33,7 +33,7 @@ function updateSummaryFromEntries(allEntries) {
     .filter((entry) => entry.type === 'OUTGOING')
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
 
-  renderSummary({
+  updateSummaryDisplay({
     totalRaised: formatAmount(totalRaised),
     totalSpent: formatAmount(totalSpent),
     balance: formatAmount(totalRaised - totalSpent),
@@ -113,7 +113,7 @@ async function init() {
     const data = await response.json();
     entries = Array.isArray(data.entries) ? data.entries : [];
 
-    updateSummaryFromEntries(entries);
+    calculateSummary(entries);
     renderTable();
   } catch (error) {
     ledgerBody.innerHTML =
