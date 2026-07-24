@@ -168,12 +168,21 @@ function txLink(txHash) {
 function setTxStatus(message, type = 'info', hash = '') {
   if (!txStatusEl) return;
   txStatusEl.className = `tx-status ${type}`;
+  txStatusEl.textContent = '';
+  const messageNode = document.createElement('span');
+  messageNode.textContent = message;
+  txStatusEl.appendChild(messageNode);
   if (hash) {
     const url = txLink(hash);
-    txStatusEl.innerHTML = `${message} <a href="${url}" target="_blank" rel="noopener noreferrer">View transaction</a>`;
+    txStatusEl.appendChild(document.createTextNode(' '));
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'View transaction';
+    txStatusEl.appendChild(link);
     return;
   }
-  txStatusEl.textContent = message;
 }
 
 function setWalletStatus(message, isError = false) {
