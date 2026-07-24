@@ -171,8 +171,13 @@ function normalizeStatus(status) {
 
 function normalizeEntry(entry) {
   return {
-    ...entry,
+    id: typeof entry.id === 'string' ? entry.id : '',
+    date: typeof entry.date === 'string' ? entry.date : '',
+    type: entry.type === 'OUTGOING' ? 'OUTGOING' : 'INCOMING',
     status: normalizeStatus(entry.status),
+    amount: Number(entry.amount) || 0,
+    category: typeof entry.category === 'string' ? entry.category : '',
+    description: typeof entry.description === 'string' ? entry.description : '',
     reference: typeof entry.reference === 'string' ? entry.reference : '',
     settledAt: Number(entry.settledAt) || 0,
     auditTrail: Array.isArray(entry.auditTrail) ? entry.auditTrail : [],

@@ -103,10 +103,10 @@ contract ProjectLedger {
     }
 
     function confirmEntry(uint256 entryId, string calldata referenceURI) external onlyOwner {
-        Entry storage entry = _getExistingEntry(entryId);
-
-        if (entry.status == EntryStatus.CONFIRMED) revert EntryAlreadyConfirmed();
         if (bytes(referenceURI).length == 0) revert EmptyReferenceURI();
+
+        Entry storage entry = _getExistingEntry(entryId);
+        if (entry.status == EntryStatus.CONFIRMED) revert EntryAlreadyConfirmed();
 
         string memory previousReferenceURI = entry.referenceURI;
         entry.status = EntryStatus.CONFIRMED;
@@ -136,7 +136,7 @@ contract ProjectLedger {
     }
 
     function _getExistingEntry(uint256 entryId) private view returns (Entry storage entry) {
+        if (entryId == 0 || entryId >= nextEntryId) revert EntryNotFound();
         entry = entries[entryId];
-        if (entry.id == 0) revert EntryNotFound();
     }
 }
