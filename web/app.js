@@ -126,7 +126,6 @@ async function init() {
 
     renderTable();
   } catch (error) {
-    showPendingSummary();
     ledgerBody.innerHTML =
       '<tr><td colspan="8">Unable to load ledger data. Please check your connection and refresh the page.</td></tr>';
     console.error(error);
