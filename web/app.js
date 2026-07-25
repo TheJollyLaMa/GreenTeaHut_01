@@ -77,16 +77,46 @@ const LEDGER_CONFIG = {
 };
 
 const PROJECT_LEDGER_ABI = [
-  'function owner() view returns (address)',
-  'function totalEntries() view returns (uint256)',
-  'function getEntry(uint256 entryId) view returns (tuple(uint256 id,uint256 amount,uint8 entryType,uint8 status,string category,string description,string referenceURI,uint256 createdAt,uint256 settledAt))',
-  'function createEntry(uint8 entryType,uint256 amount,string category,string description,string referenceURI) returns (uint256)',
-  'function confirmEntry(uint256 entryId,string referenceURI)',
-  'function updateReferenceURI(uint256 entryId,string referenceURI)',
+  // View — role-based access control (AccessControl from OpenZeppelin)
+  'function ADMIN_ROLE() view returns (bytes32)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function getRoleAdmin(bytes32 role) view returns (bytes32)',
+  'function supportsInterface(bytes4 interfaceId) view returns (bool)',
+  // View — ledger reads
+  'function NATIVE_ASSET() view returns (address)',
+  'function nextId() view returns (uint256)',
+  'function getEntryCount() view returns (uint256)',
+  'function getEntry(uint256 id) view returns (tuple(uint256 id, uint256 timestamp, uint256 settledAt, uint8 txType, uint8 status, address asset, uint8 assetDecimals, uint256 amount, string category, string description, string referenceURI, address enteredBy))',
+  'function getEntries(uint256 offset, uint256 limit) view returns (tuple(uint256 id, uint256 timestamp, uint256 settledAt, uint8 txType, uint8 status, address asset, uint8 assetDecimals, uint256 amount, string category, string description, string referenceURI, address enteredBy)[])',
+  'function getTotalsByAsset(address asset) view returns (uint256 incoming, uint256 outgoing, int256 balance)',
+  'function getConfirmedTotalsByAsset(address asset) view returns (uint256 incoming, uint256 outgoing, int256 balance)',
+  // Write — role-based access control
+  'function grantRole(bytes32 role, address account)',
+  'function revokeRole(bytes32 role, address account)',
+  'function renounceRole(bytes32 role, address callerConfirmation)',
+  // Write — ledger mutations
+  'function addEntry(uint8 txType, uint8 status, address asset, uint8 assetDecimals, uint256 amount, string category, string description, string referenceURI)',
+  'function confirmEntry(uint256 id, string referenceURI)',
+  'function updateReferenceURI(uint256 id, string newReferenceURI)',
+  'function updateStatus(uint256 id, uint8 newStatus)',
+  // Write — asset flows
+  'function depositNative(string category, string description, string referenceURI) payable returns (uint256 entryId)',
+  'function depositERC20(address token, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
+  'function withdrawNative(address to, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
+  'function withdrawERC20(address token, address to, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
 ];
 
 const STATUS_PENDING = 'PENDING';
 const STATUS_SETTLED = 'SETTLED';
+
+// TxType enum values in the deployed ProjectLedger contract.
+const TX_TYPE_INCOMING = 0;
+const TX_TYPE_OUTGOING = 1;
+// Status enum values (on-chain uint8).
+const ENTRY_STATUS_PENDING = 0;
+// Fallback zero-address used as nativeAssetAddress before NATIVE_ASSET() resolves.
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 const ledgerBody = document.getElementById('ledger-body');
 const totalRaisedEl = document.getElementById('total-raised');
@@ -122,6 +152,8 @@ let entries = [];
 let currentAccount = '';
 let connectedChainId = null;
 let isAdminWallet = false;
+// Cached from NATIVE_ASSET() view call; used as the asset address for off-chain addEntry records.
+let nativeAssetAddress = ZERO_ADDRESS;
 
 function formatAmount(value) {
   return currency.format(Number(value) || 0);
@@ -218,14 +250,20 @@ function setFormEnabled(enabled) {
 
 function normalizeEntry(entry) {
   const status = Number(entry.status) === 1 ? STATUS_SETTLED : STATUS_PENDING;
-  const type = Number(entry.entryType) === 1 ? 'OUTGOING' : 'INCOMING';
+  const type = Number(entry.txType) === TX_TYPE_OUTGOING ? 'OUTGOING' : 'INCOMING';
+  // Scale the raw on-chain amount by the asset's decimal places so the UI
+  // displays a human-readable value (e.g. 1e18 wei → 1 ETH, or whole-dollar
+  // records stored with assetDecimals=0 are returned unchanged).
+  const decimals = Number(entry.assetDecimals) || 0;
+  const rawAmount = toNumeric(entry.amount);
+  const displayAmount = decimals > 0 ? rawAmount / 10 ** decimals : rawAmount;
   return {
     id: toNumeric(entry.id),
-    createdAt: toNumeric(entry.createdAt),
+    createdAt: toNumeric(entry.timestamp),
     settledAt: toNumeric(entry.settledAt),
     type,
     status,
-    amount: toNumeric(entry.amount),
+    amount: displayAmount,
     category: entry.category || '',
     description: entry.description || '',
     reference: entry.referenceURI || '',
@@ -475,13 +513,12 @@ function getReadContract() {
 }
 
 // Validates the contract is accessible: confirms bytecode exists at the address and
-// that a required view function responds without a CALL_EXCEPTION.
+// that required view function selectors respond without a CALL_EXCEPTION.
 // Returns an object: { ok: boolean, reason: string }
 async function validateContractInterface() {
   let provider;
-  let contract;
   try {
-    ({ contract, provider } = getReadContract());
+    ({ provider } = getReadContract());
   } catch (error) {
     return { ok: false, reason: error.message };
   }
@@ -504,21 +541,59 @@ async function validateContractInterface() {
     };
   }
 
-  // 2. Smoke-test the most basic read call to catch ABI selector mismatches early.
-  try {
-    await contract.totalEntries();
-  } catch (error) {
-    const isAbiMismatch =
-      error?.code === 'CALL_EXCEPTION' ||
-      error?.code === 'BAD_DATA' ||
-      String(error?.message).includes('CALL_EXCEPTION');
-    if (isAbiMismatch) {
+  // 2. Verify required function selectors are present by making raw calls.
+  //    Selectors not in the contract's dispatch table return empty data (0x),
+  //    allowing precise detection of ABI drift without relying on full ABI encoding.
+  //    Selector values are keccak256(signature)[0:4] — see web/deployment-metadata.json.
+  const requiredSelectors = [
+    { selector: '0x7a360e65', name: 'getEntryCount()' },
+    // ADMIN_ROLE() is a simple no-arg view that returns the bytes32 role hash.
+    { selector: '0x75b238fc', name: 'ADMIN_ROLE()' },
+    // getEntry(uint256) requires an argument; pad with 64 hex zeros (32 bytes = one uint256).
+    // id=0 triggers a revert in the contract. A non-empty revert confirms the selector exists.
+    {
+      selector: '0xbae78d7b',
+      name: 'getEntry(uint256)',
+      // 64 hex chars = 32 bytes = one ABI-encoded uint256(0) argument.
+      data: '0xbae78d7b' + '0'.repeat(64),
+      expectRevertWithData: true,
+    },
+  ];
+
+  for (const { selector, name, data, expectRevertWithData } of requiredSelectors) {
+    let result;
+    try {
+      result = await provider.call({
+        to: LEDGER_CONFIG.contractAddress,
+        data: data || selector,
+      });
+    } catch (error) {
+      if (expectRevertWithData) {
+        // A revert with non-empty error data means the function exists but rejected
+        // the invalid argument (expected behaviour for getEntry with id=0).
+        const hasErrorData = error?.data && error.data !== '0x';
+        if (hasErrorData) continue;
+      }
+      const isAbiMismatch =
+        error?.code === 'CALL_EXCEPTION' ||
+        error?.code === 'BAD_DATA' ||
+        String(error?.message).includes('CALL_EXCEPTION');
+      if (isAbiMismatch) {
+        return {
+          ok: false,
+          reason: `Contract ABI mismatch: ${name} (selector ${selector}) is not available at ${LEDGER_CONFIG.contractAddress}. The ABI in this app may not match the deployed contract.`,
+        };
+      }
+      return { ok: false, reason: getErrorMessage(error, 'Contract call failed.') };
+    }
+
+    // An empty result means the 4-byte selector is not in the contract's dispatch table.
+    if (!result || result === '0x') {
       return {
         ok: false,
-        reason: `Contract ABI mismatch: the deployed contract at ${LEDGER_CONFIG.contractAddress} does not expose the expected interface. The contract may have been redeployed with a different ABI.`,
+        reason: `Contract ABI mismatch: ${name} (selector ${selector}) is not present at ${LEDGER_CONFIG.contractAddress}. The contract may have been redeployed with a different ABI.`,
       };
     }
-    return { ok: false, reason: getErrorMessage(error, 'Contract call failed.') };
   }
 
   return { ok: true, reason: '' };
@@ -538,7 +613,7 @@ async function getSignerContract() {
 
 async function fetchEntriesFromContract() {
   const { contract } = getReadContract();
-  const totalEntriesRaw = await contract.totalEntries();
+  const totalEntriesRaw = await contract.getEntryCount();
   const totalEntries = toNumeric(totalEntriesRaw);
 
   if (totalEntries === 0) return [];
@@ -546,12 +621,10 @@ async function fetchEntriesFromContract() {
   const pageSize = LEDGER_CONFIG.entryPageSize;
   const loaded = [];
 
-  // Keep requests batched to avoid overloading public RPC endpoints.
-  for (let start = 1; start <= totalEntries; start += pageSize) {
-    const end = Math.min(totalEntries, start + pageSize - 1);
-    const ids = [];
-    for (let id = start; id <= end; id += 1) ids.push(id);
-    const pageEntries = await Promise.all(ids.map((id) => contract.getEntry(id)));
+  // Use getEntries(offset, limit) for batched reads; avoids N individual calls.
+  for (let offset = 0; offset < totalEntries; offset += pageSize) {
+    const limit = Math.min(pageSize, totalEntries - offset);
+    const pageEntries = await contract.getEntries(offset, limit);
     loaded.push(...pageEntries.map(normalizeEntry));
   }
 
@@ -599,18 +672,19 @@ async function refreshWalletState() {
     return;
   }
 
-  let ownerAddress = '';
+  let isAdminByRole = false;
   try {
-    ownerAddress = await getReadContract().contract.owner();
+    const readContract = getReadContract().contract;
+    const adminRole = await readContract.ADMIN_ROLE();
+    isAdminByRole = await readContract.hasRole(adminRole, currentAccount);
   } catch (error) {
     console.error(error);
   }
 
   const normalizedAccount = currentAccount.toLowerCase();
   const isAllowlisted = LEDGER_CONFIG.adminAllowlist.some((address) => address.toLowerCase() === normalizedAccount);
-  const isOwner = ownerAddress.length > 0 && ownerAddress.toLowerCase() === normalizedAccount;
 
-  isAdminWallet = Boolean(isOwner || isAllowlisted);
+  isAdminWallet = Boolean(isAdminByRole || isAllowlisted);
   setFormEnabled(isAdminWallet);
 
   if (isAdminWallet) {
@@ -718,11 +792,17 @@ async function handleEntrySubmit(event) {
   const signerContract = await getSignerContract();
   if (!signerContract) return;
 
-  const entryTypeValue = values.type === 'OUTGOING' ? 1 : 0;
+  const entryTypeValue = values.type === 'OUTGOING' ? TX_TYPE_OUTGOING : TX_TYPE_INCOMING;
+  // ENTRY_STATUS_PENDING = 0; asset is the native-asset sentinel from the contract,
+  // with assetDecimals=0 so whole-number dollar amounts are stored as-is.
+  const assetDecimals = 0;
 
   await runTransaction('Entry creation', () =>
-    signerContract.createEntry(
+    signerContract.addEntry(
       entryTypeValue,
+      ENTRY_STATUS_PENDING,
+      nativeAssetAddress,
+      assetDecimals,
       values.amount,
       values.category,
       values.description,
@@ -766,6 +846,14 @@ function bindWalletEvents() {
 }
 
 async function init() {
+  // Cache the native-asset sentinel address used by addEntry for off-chain records.
+  try {
+    const { contract } = getReadContract();
+    nativeAssetAddress = await contract.NATIVE_ASSET();
+  } catch {
+    // Keep the zero-address fallback if the RPC is unavailable at startup.
+  }
+
   if (walletButtonEl) {
     walletButtonEl.addEventListener('click', connectWallet);
   }
