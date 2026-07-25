@@ -127,6 +127,15 @@ function formatAmount(value) {
   return currency.format(Number(value) || 0);
 }
 
+function getErrorMessage(error, fallback = 'An unexpected error occurred. Please try again.') {
+  return (
+    error?.shortMessage ||
+    error?.info?.error?.message ||
+    error?.message ||
+    fallback
+  );
+}
+
 function formatDateTime(unixSeconds) {
   if (!unixSeconds) return '—';
   const date = new Date(Number(unixSeconds) * 1000);
@@ -346,12 +355,7 @@ async function runTransaction(label, action) {
     setTxStatus(`${label} confirmed.`, 'success', tx.hash);
     await refreshLedger();
   } catch (error) {
-    const message =
-      error?.shortMessage ||
-      error?.info?.error?.message ||
-      error?.message ||
-      'Transaction failed. Please try again.';
-    setTxStatus(message, 'error');
+    setTxStatus(getErrorMessage(error, 'Transaction failed. Please try again.'), 'error');
   }
 }
 
@@ -514,7 +518,7 @@ async function validateContractInterface() {
         reason: `Contract ABI mismatch: the deployed contract at ${LEDGER_CONFIG.contractAddress} does not expose the expected interface. The contract may have been redeployed with a different ABI.`,
       };
     }
-    return { ok: false, reason: error?.shortMessage || error?.message || 'Contract call failed.' };
+    return { ok: false, reason: getErrorMessage(error, 'Contract call failed.') };
   }
 
   return { ok: true, reason: '' };
@@ -604,7 +608,7 @@ async function refreshWalletState() {
 
   const normalizedAccount = currentAccount.toLowerCase();
   const isAllowlisted = LEDGER_CONFIG.adminAllowlist.some((address) => address.toLowerCase() === normalizedAccount);
-  const isOwner = ownerAddress && ownerAddress.toLowerCase() === normalizedAccount;
+  const isOwner = ownerAddress.length > 0 && ownerAddress.toLowerCase() === normalizedAccount;
 
   isAdminWallet = Boolean(isOwner || isAllowlisted);
   setFormEnabled(isAdminWallet);
@@ -638,7 +642,7 @@ async function refreshLedger() {
     const isNetwork = error?.code === 'NETWORK_ERROR' || error?.code === 'ETIMEDOUT';
     const message = isNetwork
       ? `Network error: unable to reach the RPC endpoint. Check your internet connection and refresh.`
-      : (error?.shortMessage || error?.message || 'Unable to load on-chain ledger data. Check your network and refresh the page.');
+      : getErrorMessage(error, 'Unable to load on-chain ledger data. Check your network and refresh the page.');
     renderStateRow(message);
   }
 }
