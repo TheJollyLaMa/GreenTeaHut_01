@@ -110,6 +110,14 @@ const PROJECT_LEDGER_ABI = [
 const STATUS_PENDING = 'PENDING';
 const STATUS_SETTLED = 'SETTLED';
 
+// TxType enum values in the deployed ProjectLedger contract.
+const TX_TYPE_INCOMING = 0;
+const TX_TYPE_OUTGOING = 1;
+// Status enum values (on-chain uint8).
+const ENTRY_STATUS_PENDING = 0;
+// Fallback zero-address used as nativeAssetAddress before NATIVE_ASSET() resolves.
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
 const ledgerBody = document.getElementById('ledger-body');
 const totalRaisedEl = document.getElementById('total-raised');
 const totalSpentEl = document.getElementById('total-spent');
@@ -145,7 +153,7 @@ let currentAccount = '';
 let connectedChainId = null;
 let isAdminWallet = false;
 // Cached from NATIVE_ASSET() view call; used as the asset address for off-chain addEntry records.
-let nativeAssetAddress = '0x0000000000000000000000000000000000000000';
+let nativeAssetAddress = ZERO_ADDRESS;
 
 function formatAmount(value) {
   return currency.format(Number(value) || 0);
@@ -242,13 +250,13 @@ function setFormEnabled(enabled) {
 
 function normalizeEntry(entry) {
   const status = Number(entry.status) === 1 ? STATUS_SETTLED : STATUS_PENDING;
-  const type = Number(entry.txType) === 1 ? 'OUTGOING' : 'INCOMING';
+  const type = Number(entry.txType) === TX_TYPE_OUTGOING ? 'OUTGOING' : 'INCOMING';
   // Scale the raw on-chain amount by the asset's decimal places so the UI
   // displays a human-readable value (e.g. 1e18 wei → 1 ETH, or whole-dollar
   // records stored with assetDecimals=0 are returned unchanged).
   const decimals = Number(entry.assetDecimals) || 0;
   const rawAmount = toNumeric(entry.amount);
-  const displayAmount = decimals > 0 ? rawAmount / Math.pow(10, decimals) : rawAmount;
+  const displayAmount = decimals > 0 ? rawAmount / 10 ** decimals : rawAmount;
   return {
     id: toNumeric(entry.id),
     createdAt: toNumeric(entry.timestamp),
@@ -784,16 +792,15 @@ async function handleEntrySubmit(event) {
   const signerContract = await getSignerContract();
   if (!signerContract) return;
 
-  const entryTypeValue = values.type === 'OUTGOING' ? 1 : 0;
-  // status 0 = PENDING; asset is the native-asset sentinel from the contract,
+  const entryTypeValue = values.type === 'OUTGOING' ? TX_TYPE_OUTGOING : TX_TYPE_INCOMING;
+  // ENTRY_STATUS_PENDING = 0; asset is the native-asset sentinel from the contract,
   // with assetDecimals=0 so whole-number dollar amounts are stored as-is.
-  const statusPending = 0;
   const assetDecimals = 0;
 
   await runTransaction('Entry creation', () =>
     signerContract.addEntry(
       entryTypeValue,
-      statusPending,
+      ENTRY_STATUS_PENDING,
       nativeAssetAddress,
       assetDecimals,
       values.amount,
