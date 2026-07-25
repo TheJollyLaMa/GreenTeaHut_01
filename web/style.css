@@ -360,9 +360,20 @@ a {
   color: var(--confirmed-text);
 }
 
-.status-request {
+.status-request,
+.status-requested {
   background: #ede9fe;
   color: #5b21b6;
+}
+
+.status-committed {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-canceled {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .eq-ghost {

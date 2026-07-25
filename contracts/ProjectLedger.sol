@@ -7,9 +7,18 @@ contract ProjectLedger {
         OUTGOING
     }
 
+    // Status lifecycle for ledger entries.
+    // PENDING (0)   — soft incoming entry: expected inflow, not yet settled.
+    // CONFIRMED (1) — finalized; frontend displays this as "SETTLED".
+    // REQUESTED (2) — soft outgoing entry: expected outflow, not yet approved/executed.
+    // COMMITTED (3) — approved and awaiting execution.
+    // CANCELED (4)  — invalidated, no longer active.
     enum EntryStatus {
         PENDING,
-        CONFIRMED // Frontend displays this as "SETTLED". "REQUEST" is a frontend-only off-chain status with no contract equivalent.
+        CONFIRMED,
+        REQUESTED,
+        COMMITTED,
+        CANCELED
     }
 
     struct Entry {
@@ -46,11 +55,22 @@ contract ProjectLedger {
         uint256 settledAt
     );
     event EntryReferenceUpdated(uint256 indexed id, string previousReferenceURI, string newReferenceURI);
+    // Emitted whenever a pending/requested entry's estimated amount is revised.
+    event AmountUpdated(
+        uint256 indexed id,
+        uint256 oldAmount,
+        uint256 newAmount,
+        address indexed updatedBy,
+        string reason,
+        string referenceURI
+    );
 
     error EmptyCategory();
     error EmptyDescription();
     error EmptyReferenceURI();
+    error EmptyReason();
     error EntryAlreadyConfirmed();
+    error EntryAlreadyFinalized();
     error EntryNotFound();
     error AmountMustBePositive();
     error Unauthorized();
@@ -64,8 +84,14 @@ contract ProjectLedger {
         owner = msg.sender;
     }
 
+    // Creates a new soft entry with the given status (PENDING, REQUESTED, etc.).
+    // Callers must supply a non-zero amount, category, and description.
+    // referenceURI is optional at creation time; pass an empty string when unavailable.
+    // Valid soft statuses at creation: PENDING (expected inflow), REQUESTED (expected outflow).
+    // CONFIRMED and CANCELED should not be used here; use confirmEntry or updateStatus instead.
     function createEntry(
         EntryType entryType,
+        EntryStatus status,
         uint256 amount,
         string calldata category,
         string calldata description,
@@ -82,7 +108,7 @@ contract ProjectLedger {
             id: entryId,
             amount: amount,
             entryType: entryType,
-            status: EntryStatus.PENDING,
+            status: status,
             category: category,
             description: description,
             referenceURI: referenceURI,
@@ -93,7 +119,7 @@ contract ProjectLedger {
         emit EntryCreated(
             entryId,
             entryType,
-            EntryStatus.PENDING,
+            status,
             amount,
             category,
             description,
@@ -102,11 +128,14 @@ contract ProjectLedger {
         );
     }
 
+    // Settles a soft entry by recording a proof/reference URL and marking it CONFIRMED.
+    // Blocked for entries that are already CONFIRMED or CANCELED.
     function confirmEntry(uint256 entryId, string calldata referenceURI) external onlyOwner {
         if (bytes(referenceURI).length == 0) revert EmptyReferenceURI();
 
         Entry storage entry = _getExistingEntry(entryId);
         if (entry.status == EntryStatus.CONFIRMED) revert EntryAlreadyConfirmed();
+        if (entry.status == EntryStatus.CANCELED) revert EntryAlreadyFinalized();
 
         string memory previousReferenceURI = entry.referenceURI;
         entry.status = EntryStatus.CONFIRMED;
@@ -114,6 +143,34 @@ contract ProjectLedger {
         entry.settledAt = block.timestamp;
 
         emit EntryConfirmed(entryId, previousReferenceURI, referenceURI, entry.settledAt);
+    }
+
+    // Revises the estimated amount of a soft entry while it is still pending/requested.
+    // Allowed only while status is PENDING, REQUESTED, or COMMITTED.
+    // Emits AmountUpdated for a full on-chain audit trail of every revision.
+    function updatePendingAmount(
+        uint256 entryId,
+        uint256 newAmount,
+        string calldata reason,
+        string calldata referenceURI
+    ) external onlyOwner {
+        if (newAmount == 0) revert AmountMustBePositive();
+        if (bytes(reason).length == 0) revert EmptyReason();
+
+        Entry storage entry = _getExistingEntry(entryId);
+
+        if (
+            entry.status != EntryStatus.PENDING &&
+            entry.status != EntryStatus.REQUESTED &&
+            entry.status != EntryStatus.COMMITTED
+        ) {
+            revert EntryAlreadyFinalized();
+        }
+
+        uint256 oldAmount = entry.amount;
+        entry.amount = newAmount;
+
+        emit AmountUpdated(entryId, oldAmount, newAmount, msg.sender, reason, referenceURI);
     }
 
     function updateReferenceURI(uint256 entryId, string calldata referenceURI) external onlyOwner {
