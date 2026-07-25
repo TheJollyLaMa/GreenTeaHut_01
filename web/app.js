@@ -211,6 +211,8 @@ let nativeAssetAddress = ZERO_ADDRESS;
 // Cached ABI compatibility result for display in wallet panel.
 let lastAbiStatus = '';
 
+const ABI_STATUS_COMPATIBLE = 'Compatible ✓';
+
 function formatAmount(value) {
   return currency.format(Number(value) || 0);
 }
@@ -341,7 +343,13 @@ function updateWalletPanel() {
 
   if (abiEl) {
     abiEl.textContent = lastAbiStatus || '—';
-    abiEl.style.color = lastAbiStatus === 'Compatible ✓' ? '#166534' : (lastAbiStatus ? '#b91c1c' : '');
+    if (lastAbiStatus === ABI_STATUS_COMPATIBLE) {
+      abiEl.style.color = '#166534';
+    } else if (lastAbiStatus) {
+      abiEl.style.color = '#b91c1c';
+    } else {
+      abiEl.style.color = '';
+    }
   }
 
   // Show/hide connect button based on connection state
@@ -818,7 +826,7 @@ async function refreshLedger() {
 
   // Validate contract existence and ABI compatibility before attempting reads.
   const { ok, reason } = await validateContractInterface();
-  lastAbiStatus = ok ? 'Compatible ✓' : `Incompatible — ${reason}`;
+  lastAbiStatus = ok ? ABI_STATUS_COMPATIBLE : `Incompatible — ${reason}`;
   if (activeView === 'wallet') updateWalletPanel();
 
   if (!ok) {
