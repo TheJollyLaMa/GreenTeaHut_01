@@ -13,8 +13,8 @@ Project funding and spending are tracked alongside milestone progress and displa
 ### Contract Deployment
 - **Contract:** `ProjectLedger` (`contracts/ProjectLedger.sol`)
 - **Address:** `0x942CcE8384a9d9bd2842365395d7a912e1a5322c`
-- **Network:** Sepolia (Chain ID `11155111`)
-- **Explorer:** https://sepolia.etherscan.io/address/0x942CcE8384a9d9bd2842365395d7a912e1a5322c
+- **Network:** Optimism (Chain ID `10`)
+- **Explorer:** https://optimistic.etherscan.io/address/0x942CcE8384a9d9bd2842365395d7a912e1a5322c
 
 ### Run frontend with the live contract
 1. Open the live frontend link above (or serve `/web` locally with any static file server).
