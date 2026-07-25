@@ -18,7 +18,7 @@ Project funding and spending are tracked alongside milestone progress and displa
 
 ### Run frontend with the live contract
 1. Open the live frontend link above (or serve `/web` locally with any static file server).
-2. Use MetaMask on **Sepolia** to avoid wrong-network errors.
+2. Use MetaMask on **Optimism** (chain ID `10`) to avoid wrong-network errors.
 3. Admin writes are enabled for the deployed contract owner wallet and this allowlisted admin wallet:
    - `0x807061DF657A7697c04045dA7d16D941861cAABc`
 4. Use **Add Entry to the Books** to create a `PENDING` on-chain entry.
@@ -42,7 +42,20 @@ If the contract is redeployed or updated:
 1. Compile the new `contracts/ProjectLedger.sol` (e.g. with Hardhat or Remix).
 2. Update `PROJECT_LEDGER_ABI` in `web/app.js` with the new function signatures.
 3. Update `LEDGER_CONFIG.contractAddress` with the new deployed address.
-4. Update the contract address in this README and in `docs/transparency.md`.
-5. Commit the compiled `.bin` file alongside the `.sol` source.
+4. Update `web/deployment-metadata.json` with the new network entry and `requiredSelectors`.
+5. Update the contract address in this README and in `docs/transparency.md`.
+6. Commit the compiled `.bin` file alongside the `.sol` source.
+7. Run `node scripts/validate-abi.js` to confirm address and selector consistency.
 
-The frontend runs a startup interface check (`validateContractInterface`) on every page load. If the ABI drifts from the deployed contract, the error message in the ledger table will indicate an ABI mismatch rather than a generic network error.
+The frontend runs a startup interface check (`validateContractInterface`) on every page load.
+It verifies bytecode is present at the configured address and that each required function
+selector responds on-chain. If the ABI drifts from the deployed contract, the error message
+in the ledger table will name the specific selector that is missing.
+
+### Contract compatibility matrix
+
+| Network  | Chain ID | Contract address                             | Compiler  | ABI version | Artifact                                         |
+|----------|----------|----------------------------------------------|-----------|-------------|--------------------------------------------------|
+| Optimism | 10       | `0x942CcE8384a9d9bd2842365395d7a912e1a5322c` | solc 0.8.30 | 1.0.0     | `contracts_ProjectLedger_sol_ProjectLedger.bin`  |
+
+ABI provenance: `web/deployment-metadata.json` records the canonical address, compiler version, and required function selectors for each network. `scripts/validate-abi.js` cross-checks `web/app.js` against this file and can be run in CI.

@@ -475,13 +475,12 @@ function getReadContract() {
 }
 
 // Validates the contract is accessible: confirms bytecode exists at the address and
-// that a required view function responds without a CALL_EXCEPTION.
+// that required view function selectors respond without a CALL_EXCEPTION.
 // Returns an object: { ok: boolean, reason: string }
 async function validateContractInterface() {
   let provider;
-  let contract;
   try {
-    ({ contract, provider } = getReadContract());
+    ({ provider } = getReadContract());
   } catch (error) {
     return { ok: false, reason: error.message };
   }
@@ -504,21 +503,60 @@ async function validateContractInterface() {
     };
   }
 
-  // 2. Smoke-test the most basic read call to catch ABI selector mismatches early.
-  try {
-    await contract.totalEntries();
-  } catch (error) {
-    const isAbiMismatch =
-      error?.code === 'CALL_EXCEPTION' ||
-      error?.code === 'BAD_DATA' ||
-      String(error?.message).includes('CALL_EXCEPTION');
-    if (isAbiMismatch) {
+  // 2. Verify required function selectors are present by making raw calls.
+  //    Selectors not in the contract's dispatch table return empty data (0x),
+  //    allowing precise detection of ABI drift without relying on full ABI encoding.
+  //    Selector values are keccak256(signature)[0:4] — see web/deployment-metadata.json.
+  const requiredSelectors = [
+    { selector: '0x7fef036e', name: 'totalEntries()' },
+    { selector: '0x8da5cb5b', name: 'owner()' },
+    // getEntry(uint256) requires an argument; pad with 64 hex zeros (32 bytes = one uint256).
+    // id=0 always triggers the EntryNotFound revert in ProjectLedger.sol (see _getExistingEntry:
+    // "if (entryId == 0 || entryId >= nextEntryId) revert EntryNotFound()"). A non-empty revert
+    // confirms the selector exists. Empty result or empty revert means the function is absent.
+    {
+      selector: '0xbae78d7b',
+      name: 'getEntry(uint256)',
+      // 64 hex chars = 32 bytes = one ABI-encoded uint256(0) argument.
+      data: '0xbae78d7b' + '0'.repeat(64),
+      expectRevertWithData: true,
+    },
+  ];
+
+  for (const { selector, name, data, expectRevertWithData } of requiredSelectors) {
+    let result;
+    try {
+      result = await provider.call({
+        to: LEDGER_CONFIG.contractAddress,
+        data: data || selector,
+      });
+    } catch (error) {
+      if (expectRevertWithData) {
+        // A revert with non-empty error data means the function exists but rejected
+        // the invalid argument (expected behaviour for getEntry with id=0).
+        const hasErrorData = error?.data && error.data !== '0x';
+        if (hasErrorData) continue;
+      }
+      const isAbiMismatch =
+        error?.code === 'CALL_EXCEPTION' ||
+        error?.code === 'BAD_DATA' ||
+        String(error?.message).includes('CALL_EXCEPTION');
+      if (isAbiMismatch) {
+        return {
+          ok: false,
+          reason: `Contract ABI mismatch: ${name} (selector ${selector}) is not available at ${LEDGER_CONFIG.contractAddress}. The ABI in this app may not match the deployed contract.`,
+        };
+      }
+      return { ok: false, reason: getErrorMessage(error, 'Contract call failed.') };
+    }
+
+    // An empty result means the 4-byte selector is not in the contract's dispatch table.
+    if (!result || result === '0x') {
       return {
         ok: false,
-        reason: `Contract ABI mismatch: the deployed contract at ${LEDGER_CONFIG.contractAddress} does not expose the expected interface. The contract may have been redeployed with a different ABI.`,
+        reason: `Contract ABI mismatch: ${name} (selector ${selector}) is not present at ${LEDGER_CONFIG.contractAddress}. The contract may have been redeployed with a different ABI.`,
       };
     }
-    return { ok: false, reason: getErrorMessage(error, 'Contract call failed.') };
   }
 
   return { ok: true, reason: '' };
