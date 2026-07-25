@@ -213,6 +213,11 @@ let lastAbiStatus = '';
 
 const ABI_STATUS_COMPATIBLE = 'Compatible ✓';
 
+// Status indicator colors shared across the wallet panel.
+const STATUS_COLOR_SUCCESS = '#166534';
+const STATUS_COLOR_ERROR = '#b91c1c';
+const STATUS_COLOR_WARNING = '#92400e';
+
 function formatAmount(value) {
   return currency.format(Number(value) || 0);
 }
@@ -304,13 +309,13 @@ function updateWalletPanel() {
   if (statusEl) {
     if (!hasProvider) {
       statusEl.textContent = 'Not installed — install MetaMask to connect.';
-      statusEl.style.color = '#b91c1c';
+      statusEl.style.color = STATUS_COLOR_ERROR;
     } else if (currentAccount) {
       statusEl.textContent = 'Connected';
-      statusEl.style.color = '#166534';
+      statusEl.style.color = STATUS_COLOR_SUCCESS;
     } else {
       statusEl.textContent = 'Disconnected';
-      statusEl.style.color = '#92400e';
+      statusEl.style.color = STATUS_COLOR_WARNING;
     }
   }
 
@@ -323,7 +328,7 @@ function updateWalletPanel() {
       const isTarget = Number(connectedChainId) === LEDGER_CONFIG.targetChainId;
       const networkName = isTarget ? LEDGER_CONFIG.targetChainName : 'Unknown network';
       networkEl.textContent = `${networkName} (Chain ID: ${connectedChainId})`;
-      networkEl.style.color = isTarget ? '' : '#b91c1c';
+      networkEl.style.color = isTarget ? '' : STATUS_COLOR_ERROR;
     } else {
       networkEl.textContent = '—';
       networkEl.style.color = '';
@@ -344,9 +349,9 @@ function updateWalletPanel() {
   if (abiEl) {
     abiEl.textContent = lastAbiStatus || '—';
     if (lastAbiStatus === ABI_STATUS_COMPATIBLE) {
-      abiEl.style.color = '#166534';
+      abiEl.style.color = STATUS_COLOR_SUCCESS;
     } else if (lastAbiStatus) {
-      abiEl.style.color = '#b91c1c';
+      abiEl.style.color = STATUS_COLOR_ERROR;
     } else {
       abiEl.style.color = '';
     }
