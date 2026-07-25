@@ -12,6 +12,7 @@ if (toolbarScrollBtn && ledgerView) {
     const isPressed = toolbarScrollBtn.getAttribute('aria-pressed') === 'true';
     const newState = !isPressed;
     toolbarScrollBtn.setAttribute('aria-pressed', String(newState));
+    toolbarScrollBtn.setAttribute('aria-label', newState ? 'Hide Public Ledger' : 'Show Public Ledger');
     ledgerView.hidden = !newState;
   });
 }
