@@ -68,10 +68,10 @@ if (aboutModal && aboutTrigger && modalClose) {
 // --- Ledger (on-chain) ---
 const LEDGER_CONFIG = {
   contractAddress: '0x942CcE8384a9d9bd2842365395d7a912e1a5322c',
-  targetChainId: 11155111,
-  targetChainName: 'Sepolia',
-  explorerBaseUrl: 'https://sepolia.etherscan.io/tx/',
-  rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+  targetChainId: 10,
+  targetChainName: 'Optimism',
+  explorerBaseUrl: 'https://optimistic.etherscan.io/tx/',
+  rpcUrl: 'https://mainnet.optimism.io',
   entryPageSize: 20,
   adminAllowlist: ['0x807061DF657A7697c04045dA7d16D941861cAABc'],
 };
