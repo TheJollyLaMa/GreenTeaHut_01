@@ -34,3 +34,15 @@ Project funding and spending are tracked alongside milestone progress and displa
 - New ledger entries begin on-chain as `PENDING`.
 - Entries move to `SETTLED` once a proof/reference URL is available.
 - On-chain contract logic uses `CONFIRMED` as its settled status (displayed in the frontend as `SETTLED`). See `contracts/ProjectLedger.sol`.
+
+### Updating the frontend ABI
+The frontend ABI in `web/app.js` (`PROJECT_LEDGER_ABI`) must stay in sync with the deployed contract.
+
+If the contract is redeployed or updated:
+1. Compile the new `contracts/ProjectLedger.sol` (e.g. with Hardhat or Remix).
+2. Update `PROJECT_LEDGER_ABI` in `web/app.js` with the new function signatures.
+3. Update `LEDGER_CONFIG.contractAddress` with the new deployed address.
+4. Update the contract address in this README and in `docs/transparency.md`.
+5. Commit the compiled `.bin` file alongside the `.sol` source.
+
+The frontend runs a startup interface check (`validateContractInterface`) on every page load. If the ABI drifts from the deployed contract, the error message in the ledger table will indicate an ABI mismatch rather than a generic network error.

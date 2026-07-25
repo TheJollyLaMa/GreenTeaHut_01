@@ -467,7 +467,57 @@ function getReadContract() {
     throw new Error('Ethers library failed to load. Refresh the page and try again.');
   }
   const provider = new window.ethers.JsonRpcProvider(LEDGER_CONFIG.rpcUrl);
-  return new window.ethers.Contract(LEDGER_CONFIG.contractAddress, PROJECT_LEDGER_ABI, provider);
+  return { contract: new window.ethers.Contract(LEDGER_CONFIG.contractAddress, PROJECT_LEDGER_ABI, provider), provider };
+}
+
+// Validates the contract is accessible: confirms bytecode exists at the address and
+// that a required view function responds without a CALL_EXCEPTION.
+// Returns an object: { ok: boolean, reason: string }
+async function validateContractInterface() {
+  let provider;
+  let contract;
+  try {
+    ({ contract, provider } = getReadContract());
+  } catch (error) {
+    return { ok: false, reason: error.message };
+  }
+
+  // 1. Verify bytecode is deployed at the configured address.
+  let code;
+  try {
+    code = await provider.getCode(LEDGER_CONFIG.contractAddress);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `Unable to reach the RPC endpoint (${LEDGER_CONFIG.rpcUrl}). Check your internet connection.`,
+    };
+  }
+
+  if (!code || code === '0x') {
+    return {
+      ok: false,
+      reason: `No contract found at ${LEDGER_CONFIG.contractAddress} on ${LEDGER_CONFIG.targetChainName}. The address may be wrong or the contract may not be deployed on this network.`,
+    };
+  }
+
+  // 2. Smoke-test the most basic read call to catch ABI selector mismatches early.
+  try {
+    await contract.totalEntries();
+  } catch (error) {
+    const isAbiMismatch =
+      error?.code === 'CALL_EXCEPTION' ||
+      error?.code === 'BAD_DATA' ||
+      String(error?.message).includes('CALL_EXCEPTION');
+    if (isAbiMismatch) {
+      return {
+        ok: false,
+        reason: `Contract ABI mismatch: the deployed contract at ${LEDGER_CONFIG.contractAddress} does not expose the expected interface. The contract may have been redeployed with a different ABI.`,
+      };
+    }
+    return { ok: false, reason: error?.shortMessage || error?.message || 'Contract call failed.' };
+  }
+
+  return { ok: true, reason: '' };
 }
 
 async function getSignerContract() {
@@ -483,7 +533,7 @@ async function getSignerContract() {
 }
 
 async function fetchEntriesFromContract() {
-  const contract = getReadContract();
+  const { contract } = getReadContract();
   const totalEntriesRaw = await contract.totalEntries();
   const totalEntries = toNumeric(totalEntriesRaw);
 
@@ -547,7 +597,7 @@ async function refreshWalletState() {
 
   let ownerAddress = '';
   try {
-    ownerAddress = await getReadContract().owner();
+    ownerAddress = await getReadContract().contract.owner();
   } catch (error) {
     console.error(error);
   }
@@ -569,6 +619,15 @@ async function refreshWalletState() {
 async function refreshLedger() {
   renderStateRow('Loading live ledger data from chain...');
 
+  // Validate contract existence and ABI compatibility before attempting reads.
+  const { ok, reason } = await validateContractInterface();
+  if (!ok) {
+    console.error('Contract validation failed:', reason);
+    calculateSummary([]);
+    renderStateRow(reason);
+    return;
+  }
+
   try {
     entries = await fetchEntriesFromContract();
     calculateSummary(entries);
@@ -576,7 +635,11 @@ async function refreshLedger() {
   } catch (error) {
     console.error(error);
     calculateSummary([]);
-    renderStateRow('Unable to load on-chain ledger data. Check your network and refresh the page.');
+    const isNetwork = error?.code === 'NETWORK_ERROR' || error?.code === 'ETIMEDOUT';
+    const message = isNetwork
+      ? `Network error: unable to reach the RPC endpoint. Check your internet connection and refresh.`
+      : (error?.shortMessage || error?.message || 'Unable to load on-chain ledger data. Check your network and refresh the page.');
+    renderStateRow(message);
   }
 }
 
