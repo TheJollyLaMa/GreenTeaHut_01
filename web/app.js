@@ -3,33 +3,58 @@
 const ABOUT_SLIDES_EMBED_URL =
   'https://docs.google.com/presentation/d/e/2PACX-1vTraXc7uqbvK62XYUSvtLul29KxMW3zTluA_wCIhTNML52gSJgnkFy04m7tiECySan_rU-qwvwd8HqT/pubembed?start=true&loop=true&delayms=5000';
 
-// --- Right toolbar ---
+// --- Right toolbar (centralized view state) ---
+// activeView: 'wallet' | 'ledger' | 'payout'
+let activeView = 'ledger';
+
+const toolbarWalletBtn = document.getElementById('toolbar-wallet');
 const toolbarScrollBtn = document.getElementById('toolbar-scroll');
-const ledgerView = document.getElementById('ledger-view');
-
-if (toolbarScrollBtn && ledgerView) {
-  toolbarScrollBtn.addEventListener('click', () => {
-    const isPressed = toolbarScrollBtn.getAttribute('aria-pressed') === 'true';
-    const newState = !isPressed;
-    toolbarScrollBtn.setAttribute('aria-pressed', String(newState));
-    toolbarScrollBtn.setAttribute('aria-label', newState ? 'Hide Public Ledger' : 'Show Public Ledger');
-    ledgerView.hidden = !newState;
-  });
-}
-
-// --- Labor & Services Payout toolbar button ---
 const toolbarPayoutBtn = document.getElementById('toolbar-payout');
+const walletView = document.getElementById('wallet-view');
+const ledgerView = document.getElementById('ledger-view');
 const payoutView = document.getElementById('payout-view');
 
-if (toolbarPayoutBtn && payoutView) {
-  toolbarPayoutBtn.addEventListener('click', () => {
-    const isPressed = toolbarPayoutBtn.getAttribute('aria-pressed') === 'true';
-    const newState = !isPressed;
-    toolbarPayoutBtn.setAttribute('aria-pressed', String(newState));
-    toolbarPayoutBtn.setAttribute('aria-label', newState ? 'Close Labor & Services Payout' : 'Open Labor & Services Payout');
-    payoutView.hidden = !newState;
-  });
+function setActiveView(view) {
+  activeView = view;
+
+  // Sync aria-pressed state — exactly one button active at a time
+  if (toolbarWalletBtn) toolbarWalletBtn.setAttribute('aria-pressed', String(view === 'wallet'));
+  if (toolbarScrollBtn) toolbarScrollBtn.setAttribute('aria-pressed', String(view === 'ledger'));
+  if (toolbarPayoutBtn) toolbarPayoutBtn.setAttribute('aria-pressed', String(view === 'payout'));
+
+  // Update accessible labels to reflect current state
+  if (toolbarWalletBtn) {
+    toolbarWalletBtn.setAttribute(
+      'aria-label',
+      view === 'wallet' ? 'Wallet & Connection (active)' : 'Show Wallet & Connection Info',
+    );
+  }
+  if (toolbarScrollBtn) {
+    toolbarScrollBtn.setAttribute(
+      'aria-label',
+      view === 'ledger' ? 'Public Ledger (active)' : 'Show Public Ledger',
+    );
+  }
+  if (toolbarPayoutBtn) {
+    toolbarPayoutBtn.setAttribute(
+      'aria-label',
+      view === 'payout' ? 'Labor & Services Payout (active)' : 'Open Labor & Services Payout',
+    );
+  }
+
+  // Show exactly one panel
+  if (walletView) walletView.hidden = view !== 'wallet';
+  if (ledgerView) ledgerView.hidden = view !== 'ledger';
+  if (payoutView) payoutView.hidden = view !== 'payout';
+
+  // Populate wallet panel when it becomes visible
+  if (view === 'wallet') updateWalletPanel();
 }
+
+// Toolbar button click handlers
+if (toolbarWalletBtn) toolbarWalletBtn.addEventListener('click', () => setActiveView('wallet'));
+if (toolbarScrollBtn) toolbarScrollBtn.addEventListener('click', () => setActiveView('ledger'));
+if (toolbarPayoutBtn) toolbarPayoutBtn.addEventListener('click', () => setActiveView('payout'));
 
 const aboutModal = document.getElementById('about-modal');
 const aboutTrigger = document.getElementById('about-trigger');
@@ -164,7 +189,7 @@ const entryCategoryEl = document.getElementById('entry-category');
 const entryDescriptionEl = document.getElementById('entry-description');
 const entryProofEl = document.getElementById('entry-proof');
 const entryFormControls = entryFormEl ? Array.from(entryFormEl.elements) : [];
-const walletButtonEl = document.querySelector('.wallet-button');
+const walletConnectBtnEl = document.getElementById('wallet-connect-btn');
 const walletStatusEl = document.getElementById('wallet-status');
 const txStatusEl = document.getElementById('tx-status');
 
@@ -258,6 +283,68 @@ function setWalletStatus(message, isError = false) {
   if (!walletStatusEl) return;
   walletStatusEl.textContent = message;
   walletStatusEl.style.color = isError ? '#b91c1c' : '#475569';
+  // If the wallet panel is visible, refresh it too
+  if (activeView === 'wallet') updateWalletPanel();
+}
+
+function updateWalletPanel() {
+  const statusEl = document.getElementById('wallet-info-status');
+  const accountEl = document.getElementById('wallet-info-account');
+  const networkEl = document.getElementById('wallet-info-network');
+  const contractEl = document.getElementById('wallet-info-contract');
+  const abiEl = document.getElementById('wallet-info-abi');
+
+  const hasProvider = Boolean(getEthereumProvider());
+
+  if (statusEl) {
+    if (!hasProvider) {
+      statusEl.textContent = 'Not installed — install MetaMask to connect.';
+      statusEl.style.color = '#b91c1c';
+    } else if (currentAccount) {
+      statusEl.textContent = 'Connected';
+      statusEl.style.color = '#166534';
+    } else {
+      statusEl.textContent = 'Disconnected';
+      statusEl.style.color = '#92400e';
+    }
+  }
+
+  if (accountEl) {
+    accountEl.textContent = currentAccount || '—';
+  }
+
+  if (networkEl) {
+    if (connectedChainId !== null) {
+      const isTarget = Number(connectedChainId) === LEDGER_CONFIG.targetChainId;
+      const networkName = isTarget ? LEDGER_CONFIG.targetChainName : 'Unknown network';
+      networkEl.textContent = `${networkName} (Chain ID: ${connectedChainId})`;
+      networkEl.style.color = isTarget ? '' : '#b91c1c';
+    } else {
+      networkEl.textContent = '—';
+      networkEl.style.color = '';
+    }
+  }
+
+  if (contractEl) {
+    const addr = LEDGER_CONFIG.contractAddress;
+    contractEl.innerHTML = '';
+    const link = document.createElement('a');
+    link.href = `${LEDGER_CONFIG.explorerBaseUrl.replace('/tx/', '/address/')}${addr}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = addr;
+    contractEl.appendChild(link);
+  }
+
+  if (abiEl) {
+    abiEl.textContent = '—';
+  }
+
+  // Show/hide connect button based on connection state
+  if (walletConnectBtnEl) {
+    walletConnectBtnEl.hidden = Boolean(currentAccount);
+    walletConnectBtnEl.textContent = hasProvider ? 'Connect MetaMask' : 'Install MetaMask';
+  }
 }
 
 function setFieldError(fieldName, message) {
@@ -882,8 +969,8 @@ async function init() {
     // Keep the zero-address fallback if the RPC is unavailable at startup.
   }
 
-  if (walletButtonEl) {
-    walletButtonEl.addEventListener('click', connectWallet);
+  if (walletConnectBtnEl) {
+    walletConnectBtnEl.addEventListener('click', connectWallet);
   }
 
   [typeFilterEl, statusFilterEl, searchFilterEl].forEach((el) => {
@@ -893,6 +980,9 @@ async function init() {
   if (entryFormEl) {
     entryFormEl.addEventListener('submit', handleEntrySubmit);
   }
+
+  // Set Ledger as the default active view on load
+  setActiveView('ledger');
 
   bindWalletEvents();
   await refreshWalletState();

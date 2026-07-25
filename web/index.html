@@ -20,9 +20,6 @@
         aria-haspopup="dialog"
         title="About Green Tea Hut #1"
       >🍵 Green Tea Hut <span class="title-num">#1</span> 🌿</h1>
-      <button type="button" class="wallet-button" aria-label="Connect MetaMask wallet">
-        <img src="assets/images/MetaMask.png" alt="" class="wallet-icon" />
-      </button>
       <p id="wallet-status" class="wallet-status" aria-live="polite">Wallet not connected.</p>
     </header>
 
@@ -236,8 +233,16 @@
       <button
         type="button"
         class="toolbar-item"
+        id="toolbar-wallet"
+        aria-label="Show Wallet &amp; Connection Info"
+        aria-pressed="false"
+        title="Wallet &amp; MetaMask"
+      ><img src="assets/images/MetaMask.png" alt="" class="toolbar-metamask-icon" /></button>
+      <button
+        type="button"
+        class="toolbar-item"
         id="toolbar-scroll"
-        aria-label="Hide Public Ledger"
+        aria-label="Public Ledger (active)"
         aria-pressed="true"
         title="Public Ledger"
       >📜</button>
@@ -250,6 +255,26 @@
         title="Labor &amp; Services Payout"
       >🎖️</button>
     </nav>
+
+    <!-- Wallet & Connection info panel -->
+    <div id="wallet-view" class="wallet-view" hidden aria-label="Wallet &amp; Connection Info">
+      <section class="wallet-info-section">
+        <h2 class="wallet-info-heading">🦊 Wallet &amp; Connection</h2>
+        <dl class="wallet-info-list">
+          <dt>Status</dt>
+          <dd id="wallet-info-status">—</dd>
+          <dt>Account</dt>
+          <dd id="wallet-info-account">—</dd>
+          <dt>Network</dt>
+          <dd id="wallet-info-network">—</dd>
+          <dt>Contract Address</dt>
+          <dd id="wallet-info-contract">—</dd>
+          <dt>ABI Compatibility</dt>
+          <dd id="wallet-info-abi">—</dd>
+        </dl>
+        <button type="button" id="wallet-connect-btn" class="wallet-connect-btn">Connect MetaMask</button>
+      </section>
+    </div><!-- #wallet-view -->
 
     <!-- Labor & Services Payout panel -->
     <div id="payout-view" class="payout-view" hidden aria-label="Labor &amp; Services Payout">
