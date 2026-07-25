@@ -241,7 +241,80 @@
         aria-pressed="true"
         title="Public Ledger"
       >📜</button>
+      <button
+        type="button"
+        class="toolbar-item"
+        id="toolbar-payout"
+        aria-label="Open Labor &amp; Services Payout"
+        aria-pressed="false"
+        title="Labor &amp; Services Payout"
+      >🎖️</button>
     </nav>
+
+    <!-- Labor & Services Payout panel -->
+    <div id="payout-view" class="payout-view" hidden aria-label="Labor &amp; Services Payout">
+      <section class="payout-section" aria-label="Payout overview">
+        <h2 class="payout-heading">🎖️ Labor &amp; Services Payout</h2>
+        <p class="payout-intro">Transparent compensation flows — who was paid, for what work, from which funding source, and in what amount.</p>
+      </section>
+
+      <section class="payout-section" aria-label="Workers and collaborators">
+        <h3 class="payout-subheading">👷 Workers &amp; Collaborators</h3>
+        <p class="payout-todo"><!-- TODO: render contributor identity, role, and contribution context from on-chain or off-chain data --></p>
+        <div class="payout-placeholder">
+          <p>No contributors listed yet. Contributor records will appear here once payout data is available.</p>
+        </div>
+      </section>
+
+      <section class="payout-section" aria-label="Payout mechanisms">
+        <h3 class="payout-subheading">⚙️ Payout Mechanisms</h3>
+        <p class="payout-todo"><!-- TODO: support fixed fee, hourly, milestone, split, retroactive/public-goods rewards --></p>
+        <div class="payout-placeholder">
+          <p>Payout mechanism details will be shown here (fixed fee, hourly, milestone, split, retroactive).</p>
+        </div>
+      </section>
+
+      <section class="payout-section" aria-label="Payment ledger">
+        <h3 class="payout-subheading">📒 Payment Ledger</h3>
+        <p class="payout-todo"><!-- TODO: connect to on-chain payout ledger; display amount, currency/asset, status, timestamp --></p>
+        <div class="table-wrap">
+          <table class="payout-table">
+            <thead>
+              <tr>
+                <th>Contributor</th>
+                <th>Role / Task</th>
+                <th>Amount</th>
+                <th>Asset</th>
+                <th>Funding Source</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="payout-body">
+              <tr>
+                <td colspan="7" class="payout-empty">No payout records yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="payout-section" aria-label="Funding sources">
+        <h3 class="payout-subheading">💰 Funding Sources</h3>
+        <p class="payout-todo"><!-- TODO: display donor, collector, fan pool, and other funding origin details --></p>
+        <div class="payout-placeholder">
+          <p>Funding source details (donors, collectors, fan pools) will appear here.</p>
+        </div>
+      </section>
+
+      <section class="payout-section" aria-label="Task-level attribution">
+        <h3 class="payout-subheading">🗂️ Task-Level Attribution</h3>
+        <p class="payout-todo"><!-- TODO: link payments to specific tasks or work items --></p>
+        <div class="payout-placeholder">
+          <p>Task and work-item attribution will be shown here once payout data is linked.</p>
+        </div>
+      </section>
+    </div><!-- #payout-view -->
 
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
     <script src="app.js"></script>

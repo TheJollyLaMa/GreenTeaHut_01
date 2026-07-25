@@ -17,6 +17,20 @@ if (toolbarScrollBtn && ledgerView) {
   });
 }
 
+// --- Labor & Services Payout toolbar button ---
+const toolbarPayoutBtn = document.getElementById('toolbar-payout');
+const payoutView = document.getElementById('payout-view');
+
+if (toolbarPayoutBtn && payoutView) {
+  toolbarPayoutBtn.addEventListener('click', () => {
+    const isPressed = toolbarPayoutBtn.getAttribute('aria-pressed') === 'true';
+    const newState = !isPressed;
+    toolbarPayoutBtn.setAttribute('aria-pressed', String(newState));
+    toolbarPayoutBtn.setAttribute('aria-label', newState ? 'Close Labor & Services Payout' : 'Open Labor & Services Payout');
+    payoutView.hidden = !newState;
+  });
+}
+
 const aboutModal = document.getElementById('about-modal');
 const aboutTrigger = document.getElementById('about-trigger');
 const modalClose = aboutModal && aboutModal.querySelector('.modal-close');
