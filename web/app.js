@@ -3,6 +3,19 @@
 const ABOUT_SLIDES_EMBED_URL =
   'https://docs.google.com/presentation/d/e/2PACX-1vTraXc7uqbvK62XYUSvtLul29KxMW3zTluA_wCIhTNML52gSJgnkFy04m7tiECySan_rU-qwvwd8HqT/pubembed?start=true&loop=true&delayms=5000';
 
+// --- Right toolbar ---
+const toolbarScrollBtn = document.getElementById('toolbar-scroll');
+const ledgerView = document.getElementById('ledger-view');
+
+if (toolbarScrollBtn && ledgerView) {
+  toolbarScrollBtn.addEventListener('click', () => {
+    const isPressed = toolbarScrollBtn.getAttribute('aria-pressed') === 'true';
+    const newState = !isPressed;
+    toolbarScrollBtn.setAttribute('aria-pressed', String(newState));
+    ledgerView.hidden = !newState;
+  });
+}
+
 const aboutModal = document.getElementById('about-modal');
 const aboutTrigger = document.getElementById('about-trigger');
 const modalClose = aboutModal && aboutModal.querySelector('.modal-close');

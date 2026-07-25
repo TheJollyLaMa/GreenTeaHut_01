@@ -137,97 +137,111 @@
         </div>
       </section>
 
-      <section class="filters" aria-label="Ledger filters">
-        <label for="type-filter">
-          Type
-          <select id="type-filter">
-            <option value="ALL">All</option>
-            <option value="INCOMING">Incoming</option>
-            <option value="OUTGOING">Outgoing</option>
-          </select>
-        </label>
-
-        <label for="status-filter">
-          Status
-          <select id="status-filter">
-            <option value="ALL">All</option>
-            <option value="PENDING">Pending</option>
-            <option value="SETTLED">Settled</option>
-          </select>
-        </label>
-
-        <label for="search-filter">
-          Search
-          <input id="search-filter" type="search" placeholder="Category or description" />
-        </label>
-      </section>
-
-      <section aria-label="Ledger entries">
-        <h2 class="ledger-heading">📜 Public Ledger</h2>
-        <p id="tx-status" class="tx-status" aria-live="polite"></p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Amount</th>
-                <th>Category</th>
-                <th>Description</th>
-                <th>Proof</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="ledger-body"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="entry-section" aria-label="Add Entry to the Books">
-        <h2 class="ledger-heading">Add Entry to the Books</h2>
-        <p class="entry-helper">New entries are added on-chain as PENDING by default. Confirm/Settle from the table when proof is ready.</p>
-        <form id="entry-form" class="entry-form" novalidate>
-          <label for="entry-type">
+      <div id="ledger-view">
+        <section class="filters" aria-label="Ledger filters">
+          <label for="type-filter">
             Type
-            <select id="entry-type" name="type" required>
-              <option value="">Select type</option>
-              <option value="INCOMING">INCOMING</option>
-              <option value="OUTGOING">OUTGOING</option>
+            <select id="type-filter">
+              <option value="ALL">All</option>
+              <option value="INCOMING">Incoming</option>
+              <option value="OUTGOING">Outgoing</option>
             </select>
-            <span id="entry-type-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label for="entry-amount">
-            Amount
-            <input id="entry-amount" name="amount" type="number" min="1" step="1" required />
-            <span id="entry-amount-error" class="field-error" aria-live="polite"></span>
+          <label for="status-filter">
+            Status
+            <select id="status-filter">
+              <option value="ALL">All</option>
+              <option value="PENDING">Pending</option>
+              <option value="SETTLED">Settled</option>
+            </select>
           </label>
 
-          <label for="entry-category">
-            Category
-            <input id="entry-category" name="category" type="text" required />
-            <span id="entry-category-error" class="field-error" aria-live="polite"></span>
+          <label for="search-filter">
+            Search
+            <input id="search-filter" type="search" placeholder="Category or description" />
           </label>
+        </section>
 
-          <label for="entry-description">
-            Description
-            <input id="entry-description" name="description" type="text" required />
-            <span id="entry-description-error" class="field-error" aria-live="polite"></span>
-          </label>
+        <section aria-label="Ledger entries">
+          <h2 class="ledger-heading">📜 Public Ledger</h2>
+          <p id="tx-status" class="tx-status" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Amount</th>
+                  <th>Category</th>
+                  <th>Description</th>
+                  <th>Proof</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ledger-body"></tbody>
+            </table>
+          </div>
+        </section>
 
-          <label for="entry-proof">
-            Proof URL (optional)
-            <input id="entry-proof" name="proof" type="url" placeholder="https://..." />
-            <span id="entry-reference-error" class="field-error" aria-live="polite"></span>
-          </label>
+        <section class="entry-section" aria-label="Add Entry to the Books">
+          <h2 class="ledger-heading">Add Entry to the Books</h2>
+          <p class="entry-helper">New entries are added on-chain as PENDING by default. Confirm/Settle from the table when proof is ready.</p>
+          <form id="entry-form" class="entry-form" novalidate>
+            <label for="entry-type">
+              Type
+              <select id="entry-type" name="type" required>
+                <option value="">Select type</option>
+                <option value="INCOMING">INCOMING</option>
+                <option value="OUTGOING">OUTGOING</option>
+              </select>
+              <span id="entry-type-error" class="field-error" aria-live="polite"></span>
+            </label>
 
-          <button type="submit" class="entry-submit">Add Entry</button>
-        </form>
-      </section>
+            <label for="entry-amount">
+              Amount
+              <input id="entry-amount" name="amount" type="number" min="1" step="1" required />
+              <span id="entry-amount-error" class="field-error" aria-live="polite"></span>
+            </label>
+
+            <label for="entry-category">
+              Category
+              <input id="entry-category" name="category" type="text" required />
+              <span id="entry-category-error" class="field-error" aria-live="polite"></span>
+            </label>
+
+            <label for="entry-description">
+              Description
+              <input id="entry-description" name="description" type="text" required />
+              <span id="entry-description-error" class="field-error" aria-live="polite"></span>
+            </label>
+
+            <label for="entry-proof">
+              Proof URL (optional)
+              <input id="entry-proof" name="proof" type="url" placeholder="https://..." />
+              <span id="entry-reference-error" class="field-error" aria-live="polite"></span>
+            </label>
+
+            <button type="submit" class="entry-submit">Add Entry</button>
+          </form>
+        </section>
+      </div><!-- #ledger-view -->
 
     </main>
+
+    <!-- Right-side floating toolbar -->
+    <nav class="right-toolbar" aria-label="Page tools">
+      <button
+        type="button"
+        class="toolbar-item"
+        id="toolbar-scroll"
+        aria-label="Show Public Ledger"
+        aria-pressed="true"
+        title="Public Ledger"
+      >📜</button>
+    </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
     <script src="app.js"></script>
