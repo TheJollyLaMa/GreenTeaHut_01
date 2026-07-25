@@ -23,6 +23,7 @@
       <button type="button" class="wallet-button" aria-label="Connect MetaMask wallet">
         <img src="assets/images/MetaMask.png" alt="" class="wallet-icon" />
       </button>
+      <p id="wallet-status" class="wallet-status" aria-live="polite">Wallet not connected.</p>
     </header>
 
     <!-- About modal -->
@@ -152,7 +153,6 @@
             <option value="ALL">All</option>
             <option value="PENDING">Pending</option>
             <option value="SETTLED">Settled</option>
-            <option value="REQUEST">Request</option>
           </select>
         </label>
 
@@ -164,6 +164,7 @@
 
       <section aria-label="Ledger entries">
         <h2 class="ledger-heading">📜 Public Ledger</h2>
+        <p id="tx-status" class="tx-status" aria-live="polite"></p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -186,7 +187,7 @@
 
       <section class="entry-section" aria-label="Add Entry to the Books">
         <h2 class="ledger-heading">Add Entry to the Books</h2>
-        <p class="entry-helper">Choose a status: PENDING for in-progress transactions, REQUEST for approved-but-unpaid obligations, or SETTLED for completed ones.</p>
+        <p class="entry-helper">New entries are added on-chain as PENDING by default. Confirm/Settle from the table when proof is ready.</p>
         <form id="entry-form" class="entry-form" novalidate>
           <label for="entry-type">
             Type
@@ -198,19 +199,9 @@
             <span id="entry-type-error" class="field-error" aria-live="polite"></span>
           </label>
 
-          <label for="entry-status">
-            Status
-            <select id="entry-status" name="status" required>
-              <option value="PENDING">PENDING</option>
-              <option value="SETTLED">SETTLED</option>
-              <option value="REQUEST">REQUEST</option>
-            </select>
-            <span id="entry-status-error" class="field-error" aria-live="polite"></span>
-          </label>
-
           <label for="entry-amount">
             Amount
-            <input id="entry-amount" name="amount" type="number" min="0.01" step="0.01" required />
+            <input id="entry-amount" name="amount" type="number" min="1" step="1" required />
             <span id="entry-amount-error" class="field-error" aria-live="polite"></span>
           </label>
 
@@ -227,15 +218,9 @@
           </label>
 
           <label for="entry-proof">
-            Proof Screenshot (optional)
-            <input id="entry-proof" name="proof" type="file" accept="image/*,.pdf" />
+            Proof URL (optional)
+            <input id="entry-proof" name="proof" type="url" placeholder="https://..." />
             <span id="entry-reference-error" class="field-error" aria-live="polite"></span>
-          </label>
-
-          <label for="entry-date">
-            Date
-            <input id="entry-date" name="date" type="date" required />
-            <span id="entry-date-error" class="field-error" aria-live="polite"></span>
           </label>
 
           <button type="submit" class="entry-submit">Add Entry</button>
@@ -244,6 +229,7 @@
 
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
