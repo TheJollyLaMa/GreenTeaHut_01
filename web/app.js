@@ -124,6 +124,7 @@ const LEDGER_CONFIG = {
   targetChainId: 10,
   targetChainName: 'Optimism',
   explorerBaseUrl: 'https://optimistic.etherscan.io/tx/',
+  explorerAddressBaseUrl: 'https://optimistic.etherscan.io/address/',
   rpcUrl: 'https://mainnet.optimism.io',
   entryPageSize: 20,
   adminAllowlist: ['0x807061DF657A7697c04045dA7d16D941861cAABc'],
@@ -207,6 +208,8 @@ let connectedChainId = null;
 let isAdminWallet = false;
 // Cached from NATIVE_ASSET() view call; used as the asset address for off-chain addEntry records.
 let nativeAssetAddress = ZERO_ADDRESS;
+// Cached ABI compatibility result for display in wallet panel.
+let lastAbiStatus = '';
 
 function formatAmount(value) {
   return currency.format(Number(value) || 0);
@@ -329,7 +332,7 @@ function updateWalletPanel() {
     const addr = LEDGER_CONFIG.contractAddress;
     contractEl.innerHTML = '';
     const link = document.createElement('a');
-    link.href = `${LEDGER_CONFIG.explorerBaseUrl.replace('/tx/', '/address/')}${addr}`;
+    link.href = `${LEDGER_CONFIG.explorerAddressBaseUrl}${addr}`;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.textContent = addr;
@@ -337,7 +340,8 @@ function updateWalletPanel() {
   }
 
   if (abiEl) {
-    abiEl.textContent = '—';
+    abiEl.textContent = lastAbiStatus || '—';
+    abiEl.style.color = lastAbiStatus === 'Compatible ✓' ? '#166534' : (lastAbiStatus ? '#b91c1c' : '');
   }
 
   // Show/hide connect button based on connection state
@@ -814,6 +818,9 @@ async function refreshLedger() {
 
   // Validate contract existence and ABI compatibility before attempting reads.
   const { ok, reason } = await validateContractInterface();
+  lastAbiStatus = ok ? 'Compatible ✓' : `Incompatible — ${reason}`;
+  if (activeView === 'wallet') updateWalletPanel();
+
   if (!ok) {
     console.error('Contract validation failed:', reason);
     calculateSummary([]);
