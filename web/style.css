@@ -61,31 +61,6 @@ body {
   border-radius: 0.25rem;
 }
 
-.wallet-button {
-  position: fixed;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 20;
-  border: 2px solid transparent;
-  background: transparent;
-  padding: 0.2rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: transform 0.15s, border-color 0.2s;
-}
-
-.wallet-button:hover {
-  transform: scale(1.08);
-  border-color: var(--accent);
-}
-
-.wallet-icon {
-  display: block;
-  width: 40px;
-  height: 40px;
-  object-fit: contain;
-}
-
 .wallet-status {
   margin: 0;
   font-size: 0.85rem;
@@ -573,8 +548,7 @@ select:disabled {
 .right-toolbar {
   position: fixed;
   right: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0.75rem;
   z-index: 30;
   display: flex;
   flex-direction: column;
@@ -584,6 +558,13 @@ select:disabled {
   border-radius: 0.75rem;
   padding: 0.5rem 0.4rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.toolbar-metamask-icon {
+  display: block;
+  width: 1.6rem;
+  height: 1.6rem;
+  object-fit: contain;
 }
 
 .toolbar-item {
@@ -615,6 +596,68 @@ select:disabled {
 .toolbar-item[aria-pressed="true"] {
   background: #ecfdf5;
   border-color: var(--accent);
+}
+
+/* Wallet info panel */
+.wallet-view {
+  margin: 2rem auto;
+  max-width: 640px;
+  padding: 0 1rem;
+}
+
+.wallet-view[hidden] {
+  display: none;
+}
+
+.wallet-info-section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 1.5rem 1.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.wallet-info-heading {
+  font-family: 'Pacifico', cursive;
+  font-size: 1.3rem;
+  color: var(--accent);
+  margin: 0 0 1rem;
+}
+
+.wallet-info-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem 1rem;
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+}
+
+.wallet-info-list dt {
+  font-weight: 700;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.wallet-info-list dd {
+  margin: 0;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.wallet-connect-btn {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 0.35rem;
+  padding: 0.6rem 1.25rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.wallet-connect-btn:hover {
+  filter: brightness(1.08);
 }
 
 /* Labor & Services Payout panel */
@@ -716,8 +759,7 @@ select:disabled {
   }
 
   .right-toolbar {
-    top: auto;
-    bottom: 1rem;
-    transform: none;
+    top: 0.5rem;
+    right: 0.5rem;
   }
 }
