@@ -15,10 +15,13 @@
         }
       },
       "requiredSelectors": {
-        "0x7fef036e": "totalEntries()",
-        "0x8da5cb5b": "owner()",
+        "0x7a360e65": "getEntryCount()",
         "0xbae78d7b": "getEntry(uint256)",
-        "0x2850ca86": "createEntry(uint8,uint256,string,string,string)",
+        "0x478e8dad": "getEntries(uint256,uint256)",
+        "0x75b238fc": "ADMIN_ROLE()",
+        "0x91d14854": "hasRole(bytes32,address)",
+        "0xbf53253b": "NATIVE_ASSET()",
+        "0x116c80f8": "addEntry(uint8,uint8,address,uint8,uint256,string,string,string)",
         "0xf5827b92": "confirmEntry(uint256,string)",
         "0xfda1e612": "updateReferenceURI(uint256,string)"
       }

@@ -77,12 +77,34 @@ const LEDGER_CONFIG = {
 };
 
 const PROJECT_LEDGER_ABI = [
-  'function owner() view returns (address)',
-  'function totalEntries() view returns (uint256)',
-  'function getEntry(uint256 entryId) view returns (tuple(uint256 id,uint256 amount,uint8 entryType,uint8 status,string category,string description,string referenceURI,uint256 createdAt,uint256 settledAt))',
-  'function createEntry(uint8 entryType,uint256 amount,string category,string description,string referenceURI) returns (uint256)',
-  'function confirmEntry(uint256 entryId,string referenceURI)',
-  'function updateReferenceURI(uint256 entryId,string referenceURI)',
+  // View — role-based access control (AccessControl from OpenZeppelin)
+  'function ADMIN_ROLE() view returns (bytes32)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function getRoleAdmin(bytes32 role) view returns (bytes32)',
+  'function supportsInterface(bytes4 interfaceId) view returns (bool)',
+  // View — ledger reads
+  'function NATIVE_ASSET() view returns (address)',
+  'function nextId() view returns (uint256)',
+  'function getEntryCount() view returns (uint256)',
+  'function getEntry(uint256 id) view returns (tuple(uint256 id, uint256 timestamp, uint256 settledAt, uint8 txType, uint8 status, address asset, uint8 assetDecimals, uint256 amount, string category, string description, string referenceURI, address enteredBy))',
+  'function getEntries(uint256 offset, uint256 limit) view returns (tuple(uint256 id, uint256 timestamp, uint256 settledAt, uint8 txType, uint8 status, address asset, uint8 assetDecimals, uint256 amount, string category, string description, string referenceURI, address enteredBy)[])',
+  'function getTotalsByAsset(address asset) view returns (uint256 incoming, uint256 outgoing, int256 balance)',
+  'function getConfirmedTotalsByAsset(address asset) view returns (uint256 incoming, uint256 outgoing, int256 balance)',
+  // Write — role-based access control
+  'function grantRole(bytes32 role, address account)',
+  'function revokeRole(bytes32 role, address account)',
+  'function renounceRole(bytes32 role, address callerConfirmation)',
+  // Write — ledger mutations
+  'function addEntry(uint8 txType, uint8 status, address asset, uint8 assetDecimals, uint256 amount, string category, string description, string referenceURI)',
+  'function confirmEntry(uint256 id, string referenceURI)',
+  'function updateReferenceURI(uint256 id, string newReferenceURI)',
+  'function updateStatus(uint256 id, uint8 newStatus)',
+  // Write — asset flows
+  'function depositNative(string category, string description, string referenceURI) payable returns (uint256 entryId)',
+  'function depositERC20(address token, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
+  'function withdrawNative(address to, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
+  'function withdrawERC20(address token, address to, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
 ];
 
 const STATUS_PENDING = 'PENDING';
@@ -122,6 +144,8 @@ let entries = [];
 let currentAccount = '';
 let connectedChainId = null;
 let isAdminWallet = false;
+// Cached from NATIVE_ASSET() view call; used as the asset address for off-chain addEntry records.
+let nativeAssetAddress = '0x0000000000000000000000000000000000000000';
 
 function formatAmount(value) {
   return currency.format(Number(value) || 0);
@@ -218,14 +242,20 @@ function setFormEnabled(enabled) {
 
 function normalizeEntry(entry) {
   const status = Number(entry.status) === 1 ? STATUS_SETTLED : STATUS_PENDING;
-  const type = Number(entry.entryType) === 1 ? 'OUTGOING' : 'INCOMING';
+  const type = Number(entry.txType) === 1 ? 'OUTGOING' : 'INCOMING';
+  // Scale the raw on-chain amount by the asset's decimal places so the UI
+  // displays a human-readable value (e.g. 1e18 wei → 1 ETH, or whole-dollar
+  // records stored with assetDecimals=0 are returned unchanged).
+  const decimals = Number(entry.assetDecimals) || 0;
+  const rawAmount = toNumeric(entry.amount);
+  const displayAmount = decimals > 0 ? rawAmount / Math.pow(10, decimals) : rawAmount;
   return {
     id: toNumeric(entry.id),
-    createdAt: toNumeric(entry.createdAt),
+    createdAt: toNumeric(entry.timestamp),
     settledAt: toNumeric(entry.settledAt),
     type,
     status,
-    amount: toNumeric(entry.amount),
+    amount: displayAmount,
     category: entry.category || '',
     description: entry.description || '',
     reference: entry.referenceURI || '',
@@ -508,12 +538,11 @@ async function validateContractInterface() {
   //    allowing precise detection of ABI drift without relying on full ABI encoding.
   //    Selector values are keccak256(signature)[0:4] — see web/deployment-metadata.json.
   const requiredSelectors = [
-    { selector: '0x7fef036e', name: 'totalEntries()' },
-    { selector: '0x8da5cb5b', name: 'owner()' },
+    { selector: '0x7a360e65', name: 'getEntryCount()' },
+    // ADMIN_ROLE() is a simple no-arg view that returns the bytes32 role hash.
+    { selector: '0x75b238fc', name: 'ADMIN_ROLE()' },
     // getEntry(uint256) requires an argument; pad with 64 hex zeros (32 bytes = one uint256).
-    // id=0 always triggers the EntryNotFound revert in ProjectLedger.sol (see _getExistingEntry:
-    // "if (entryId == 0 || entryId >= nextEntryId) revert EntryNotFound()"). A non-empty revert
-    // confirms the selector exists. Empty result or empty revert means the function is absent.
+    // id=0 triggers a revert in the contract. A non-empty revert confirms the selector exists.
     {
       selector: '0xbae78d7b',
       name: 'getEntry(uint256)',
@@ -576,7 +605,7 @@ async function getSignerContract() {
 
 async function fetchEntriesFromContract() {
   const { contract } = getReadContract();
-  const totalEntriesRaw = await contract.totalEntries();
+  const totalEntriesRaw = await contract.getEntryCount();
   const totalEntries = toNumeric(totalEntriesRaw);
 
   if (totalEntries === 0) return [];
@@ -584,12 +613,10 @@ async function fetchEntriesFromContract() {
   const pageSize = LEDGER_CONFIG.entryPageSize;
   const loaded = [];
 
-  // Keep requests batched to avoid overloading public RPC endpoints.
-  for (let start = 1; start <= totalEntries; start += pageSize) {
-    const end = Math.min(totalEntries, start + pageSize - 1);
-    const ids = [];
-    for (let id = start; id <= end; id += 1) ids.push(id);
-    const pageEntries = await Promise.all(ids.map((id) => contract.getEntry(id)));
+  // Use getEntries(offset, limit) for batched reads; avoids N individual calls.
+  for (let offset = 0; offset < totalEntries; offset += pageSize) {
+    const limit = Math.min(pageSize, totalEntries - offset);
+    const pageEntries = await contract.getEntries(offset, limit);
     loaded.push(...pageEntries.map(normalizeEntry));
   }
 
@@ -637,18 +664,19 @@ async function refreshWalletState() {
     return;
   }
 
-  let ownerAddress = '';
+  let isAdminByRole = false;
   try {
-    ownerAddress = await getReadContract().contract.owner();
+    const readContract = getReadContract().contract;
+    const adminRole = await readContract.ADMIN_ROLE();
+    isAdminByRole = await readContract.hasRole(adminRole, currentAccount);
   } catch (error) {
     console.error(error);
   }
 
   const normalizedAccount = currentAccount.toLowerCase();
   const isAllowlisted = LEDGER_CONFIG.adminAllowlist.some((address) => address.toLowerCase() === normalizedAccount);
-  const isOwner = ownerAddress.length > 0 && ownerAddress.toLowerCase() === normalizedAccount;
 
-  isAdminWallet = Boolean(isOwner || isAllowlisted);
+  isAdminWallet = Boolean(isAdminByRole || isAllowlisted);
   setFormEnabled(isAdminWallet);
 
   if (isAdminWallet) {
@@ -757,10 +785,17 @@ async function handleEntrySubmit(event) {
   if (!signerContract) return;
 
   const entryTypeValue = values.type === 'OUTGOING' ? 1 : 0;
+  // status 0 = PENDING; asset is the native-asset sentinel from the contract,
+  // with assetDecimals=0 so whole-number dollar amounts are stored as-is.
+  const statusPending = 0;
+  const assetDecimals = 0;
 
   await runTransaction('Entry creation', () =>
-    signerContract.createEntry(
+    signerContract.addEntry(
       entryTypeValue,
+      statusPending,
+      nativeAssetAddress,
+      assetDecimals,
       values.amount,
       values.category,
       values.description,
@@ -804,6 +839,14 @@ function bindWalletEvents() {
 }
 
 async function init() {
+  // Cache the native-asset sentinel address used by addEntry for off-chain records.
+  try {
+    const { contract } = getReadContract();
+    nativeAssetAddress = await contract.NATIVE_ASSET();
+  } catch {
+    // Keep the zero-address fallback if the RPC is unavailable at startup.
+  }
+
   if (walletButtonEl) {
     walletButtonEl.addEventListener('click', connectWallet);
   }
