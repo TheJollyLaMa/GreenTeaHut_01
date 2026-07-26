@@ -9,7 +9,7 @@ contract ProjectLedger {
 
     // Status lifecycle for ledger entries.
     // PENDING (0)   — soft incoming entry: expected inflow, not yet settled.
-    // CONFIRMED (1) — finalized; frontend displays this as "SETTLED".
+    // CONFIRMED (1) — finalized; the on-chain settled state.
     // REQUESTED (2) — soft outgoing entry: expected outflow, not yet approved/executed.
     // COMMITTED (3) — approved and awaiting execution.
     // CANCELED (4)  — invalidated, no longer active.
@@ -64,6 +64,13 @@ contract ProjectLedger {
         string reason,
         string referenceURI
     );
+    // Emitted whenever a status transition occurs via updateStatus.
+    event EntryStatusUpdated(
+        uint256 indexed id,
+        EntryStatus oldStatus,
+        EntryStatus newStatus,
+        uint256 updatedAt
+    );
 
     error EmptyCategory();
     error EmptyDescription();
@@ -74,6 +81,9 @@ contract ProjectLedger {
     error EntryNotFound();
     error AmountMustBePositive();
     error Unauthorized();
+    error AlreadyInStatus();
+    error InvalidInitialStatus();
+    error InvalidStatusTransition();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert Unauthorized();
@@ -87,8 +97,8 @@ contract ProjectLedger {
     // Creates a new soft entry with the given status (PENDING, REQUESTED, etc.).
     // Callers must supply a non-zero amount, category, and description.
     // referenceURI is optional at creation time; pass an empty string when unavailable.
-    // Valid soft statuses at creation: PENDING (expected inflow), REQUESTED (expected outflow).
-    // CONFIRMED and CANCELED should not be used here; use confirmEntry or updateStatus instead.
+    // Valid initial statuses: PENDING, REQUESTED, or COMMITTED.
+    // CONFIRMED and CANCELED are blocked at creation; use confirmEntry or updateStatus instead.
     function createEntry(
         EntryType entryType,
         EntryStatus status,
@@ -100,6 +110,7 @@ contract ProjectLedger {
         if (amount == 0) revert AmountMustBePositive();
         if (bytes(category).length == 0) revert EmptyCategory();
         if (bytes(description).length == 0) revert EmptyDescription();
+        if (status == EntryStatus.CONFIRMED || status == EntryStatus.CANCELED) revert InvalidInitialStatus();
 
         entryId = nextEntryId;
         nextEntryId += 1;
@@ -143,6 +154,28 @@ contract ProjectLedger {
         entry.settledAt = block.timestamp;
 
         emit EntryConfirmed(entryId, previousReferenceURI, referenceURI, entry.settledAt);
+    }
+
+    // Transitions a soft entry to a new status.
+    // Allowed transitions:
+    //   REQUESTED → COMMITTED, CANCELED
+    //   COMMITTED → CANCELED
+    //   PENDING   → CANCELED
+    function updateStatus(uint256 entryId, EntryStatus newStatus) external onlyOwner {
+        Entry storage entry = _getExistingEntry(entryId);
+        EntryStatus current = entry.status;
+
+        if (current == newStatus) revert AlreadyInStatus();
+        if (current == EntryStatus.CONFIRMED || current == EntryStatus.CANCELED) revert EntryAlreadyFinalized();
+
+        bool valid = (current == EntryStatus.REQUESTED && (newStatus == EntryStatus.COMMITTED || newStatus == EntryStatus.CANCELED)) ||
+                     (current == EntryStatus.COMMITTED && newStatus == EntryStatus.CANCELED) ||
+                     (current == EntryStatus.PENDING && newStatus == EntryStatus.CANCELED);
+
+        if (!valid) revert InvalidStatusTransition();
+
+        entry.status = newStatus;
+        emit EntryStatusUpdated(entryId, current, newStatus, block.timestamp);
     }
 
     // Revises the estimated amount of a soft entry while it is still pending/requested.

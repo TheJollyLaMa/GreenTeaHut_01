@@ -120,68 +120,45 @@ if (aboutModal && aboutTrigger && modalClose) {
 
 // --- Ledger (on-chain) ---
 const LEDGER_CONFIG = {
-  contractAddress: '0x942CcE8384a9d9bd2842365395d7a912e1a5322c',
+  contractAddress: '0x44500FFd99B621620f393FCdbcF55D5137A55A23',
   targetChainId: 10,
   targetChainName: 'Optimism',
   explorerBaseUrl: 'https://optimistic.etherscan.io/tx/',
   explorerAddressBaseUrl: 'https://optimistic.etherscan.io/address/',
   rpcUrl: 'https://mainnet.optimism.io',
   entryPageSize: 20,
-  adminAllowlist: ['0x807061DF657A7697c04045dA7d16D941861cAABc'],
 };
 
 const PROJECT_LEDGER_ABI = [
-  // View — role-based access control (AccessControl from OpenZeppelin)
-  'function ADMIN_ROLE() view returns (bytes32)',
-  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
-  'function hasRole(bytes32 role, address account) view returns (bool)',
-  'function getRoleAdmin(bytes32 role) view returns (bytes32)',
-  'function supportsInterface(bytes4 interfaceId) view returns (bool)',
   // View — ledger reads
-  'function NATIVE_ASSET() view returns (address)',
-  'function nextId() view returns (uint256)',
-  'function getEntryCount() view returns (uint256)',
-  'function getEntry(uint256 id) view returns (tuple(uint256 id, uint256 timestamp, uint256 settledAt, uint8 txType, uint8 status, address asset, uint8 assetDecimals, uint256 amount, string category, string description, string referenceURI, address enteredBy))',
-  'function getEntries(uint256 offset, uint256 limit) view returns (tuple(uint256 id, uint256 timestamp, uint256 settledAt, uint8 txType, uint8 status, address asset, uint8 assetDecimals, uint256 amount, string category, string description, string referenceURI, address enteredBy)[])',
-  'function getTotalsByAsset(address asset) view returns (uint256 incoming, uint256 outgoing, int256 balance)',
-  'function getConfirmedTotalsByAsset(address asset) view returns (uint256 incoming, uint256 outgoing, int256 balance)',
-  // Write — role-based access control
-  'function grantRole(bytes32 role, address account)',
-  'function revokeRole(bytes32 role, address account)',
-  'function renounceRole(bytes32 role, address callerConfirmation)',
+  'function totalEntries() view returns (uint256)',
+  'function getEntry(uint256 entryId) view returns (tuple(uint256 id, uint256 amount, uint8 entryType, uint8 status, string category, string description, string referenceURI, uint256 createdAt, uint256 settledAt))',
+  'function owner() view returns (address)',
   // Write — ledger mutations
-  'function addEntry(uint8 txType, uint8 status, address asset, uint8 assetDecimals, uint256 amount, string category, string description, string referenceURI)',
-  'function confirmEntry(uint256 id, string referenceURI)',
-  'function updateReferenceURI(uint256 id, string newReferenceURI)',
-  'function updateStatus(uint256 id, uint8 newStatus)',
-  'function updatePendingAmount(uint256 id, uint256 newAmount, string reason, string referenceURI)',
-  // Write — asset flows
-  'function depositNative(string category, string description, string referenceURI) payable returns (uint256 entryId)',
-  'function depositERC20(address token, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
-  'function withdrawNative(address to, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
-  'function withdrawERC20(address token, address to, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
+  'function createEntry(uint8 entryType, uint8 status, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
+  'function updateStatus(uint256 entryId, uint8 newStatus)',
+  'function confirmEntry(uint256 entryId, string referenceURI)',
+  'function updateReferenceURI(uint256 entryId, string referenceURI)',
+  'function updatePendingAmount(uint256 entryId, uint256 newAmount, string reason, string referenceURI)',
 ];
 
 const STATUS_PENDING = 'PENDING';
-const STATUS_SETTLED = 'SETTLED';
+const STATUS_CONFIRMED = 'CONFIRMED';
 const STATUS_REQUESTED = 'REQUESTED';
 const STATUS_COMMITTED = 'COMMITTED';
 const STATUS_CANCELED = 'CANCELED';
 
-// TxType enum values in the deployed ProjectLedger contract.
+// EntryType enum values in the deployed ProjectLedger contract.
 const TX_TYPE_INCOMING = 0;
 const TX_TYPE_OUTGOING = 1;
-// Status enum values (on-chain uint8). Order must match EntryStatus in ProjectLedger.sol.
+// EntryStatus enum values (on-chain uint8). Order must match EntryStatus in ProjectLedger.sol.
+// PENDING (0) — soft incoming entry; CONFIRMED (1) — finalized/settled.
+// REQUESTED (2) — soft outgoing entry; COMMITTED (3) — approved; CANCELED (4) — voided.
 const ENTRY_STATUS_PENDING = 0;
+const ENTRY_STATUS_CONFIRMED = 1;
 const ENTRY_STATUS_REQUESTED = 2;
-// ENTRY_STATUS_COMMITTED = 3 and ENTRY_STATUS_CANCELED = 4 are available but not
-// used as creation targets from the UI (set via updateStatus after creation).
-// Fallback zero-address used as nativeAssetAddress before NATIVE_ASSET() resolves.
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-// The deployed contract enforces assetDecimals == 18 for any entry whose asset address
-// matches the NATIVE_ASSET() sentinel.  Sending any other value causes an on-chain revert:
-//   "Native must use 18 decimals"
-const NATIVE_ASSET_DECIMALS = 18;
+const ENTRY_STATUS_COMMITTED = 3;
+const ENTRY_STATUS_CANCELED = 4;
 
 const ledgerBody = document.getElementById('ledger-body');
 const totalRaisedEl = document.getElementById('total-raised');
@@ -218,8 +195,6 @@ let entries = [];
 let currentAccount = '';
 let connectedChainId = null;
 let isAdminWallet = false;
-// Cached from NATIVE_ASSET() view call; used as the asset address for off-chain addEntry records.
-let nativeAssetAddress = ZERO_ADDRESS;
 // Cached ABI compatibility result for display in wallet panel.
 let lastAbiStatus = '';
 
@@ -399,26 +374,22 @@ function setFormEnabled(enabled) {
 function normalizeEntry(entry) {
   // Map on-chain uint8 status to a display string.
   // Values must match EntryStatus enum order in ProjectLedger.sol:
-  //   0 = PENDING, 1 = CONFIRMED (→ SETTLED), 2 = REQUESTED, 3 = COMMITTED, 4 = CANCELED
+  //   0 = PENDING, 1 = CONFIRMED, 2 = REQUESTED, 3 = COMMITTED, 4 = CANCELED
   const ON_CHAIN_STATUS_MAP = {
     0: STATUS_PENDING,
-    1: STATUS_SETTLED,
+    1: STATUS_CONFIRMED,
     2: STATUS_REQUESTED,
     3: STATUS_COMMITTED,
     4: STATUS_CANCELED,
   };
   const statusCode = Number(entry.status);
   const status = ON_CHAIN_STATUS_MAP[statusCode] ?? STATUS_PENDING;
-  const type = Number(entry.txType) === TX_TYPE_OUTGOING ? 'OUTGOING' : 'INCOMING';
-  // Scale the raw on-chain amount by the asset's decimal places so the UI
-  // displays a human-readable value (e.g. 1e18 wei → 1 ETH, or whole-dollar
-  // records stored with assetDecimals=0 are returned unchanged).
-  const decimals = Number(entry.assetDecimals) || 0;
-  const rawAmount = toNumeric(entry.amount);
-  const displayAmount = decimals > 0 ? rawAmount / 10 ** decimals : rawAmount;
+  const type = Number(entry.entryType) === TX_TYPE_OUTGOING ? 'OUTGOING' : 'INCOMING';
+  // Amount is stored as a plain uint256 (whole-number USD); no decimal scaling needed.
+  const displayAmount = toNumeric(entry.amount);
   return {
     id: toNumeric(entry.id),
-    createdAt: toNumeric(entry.timestamp),
+    createdAt: toNumeric(entry.createdAt),
     settledAt: toNumeric(entry.settledAt),
     type,
     status,
@@ -441,7 +412,7 @@ function updateSummaryDisplay(summary) {
 
 function calculateSummary(allEntries) {
   const settledRaised = allEntries
-    .filter((e) => e.type === 'INCOMING' && e.status === STATUS_SETTLED)
+    .filter((e) => e.type === 'INCOMING' && e.status === STATUS_CONFIRMED)
     .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   const pendingRaised = allEntries
@@ -449,7 +420,7 @@ function calculateSummary(allEntries) {
     .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   const settledSpent = allEntries
-    .filter((e) => e.type === 'OUTGOING' && e.status === STATUS_SETTLED)
+    .filter((e) => e.type === 'OUTGOING' && e.status === STATUS_CONFIRMED)
     .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   const pendingSpent = allEntries
@@ -496,7 +467,7 @@ function getFilteredEntries() {
 function getStatusBadge(status) {
   const badge = document.createElement('span');
   const classMap = {
-    [STATUS_SETTLED]: 'status-settled',
+    [STATUS_CONFIRMED]: 'status-settled',
     [STATUS_PENDING]: 'status-pending',
     [STATUS_REQUESTED]: 'status-requested',
     [STATUS_COMMITTED]: 'status-committed',
@@ -615,8 +586,15 @@ async function handleReviseAmount(entryId, currentAmount) {
   if (!signerContract) return;
   await runTransaction(
     'Amount revision',
-    () => signerContract.updatePendingAmount(entryId, newAmount, reason.trim(), referenceUrl.trim()),
+    () => signerContract.updatePendingAmount(entryId, BigInt(Math.round(newAmount)), reason.trim(), referenceUrl.trim()),
   );
+}
+
+async function handleUpdateStatus(entryId, newStatusCode, label) {
+  if (!isAdminWallet) return;
+  const signerContract = await getSignerContract();
+  if (!signerContract) return;
+  await runTransaction(`Status update (→ ${label})`, () => signerContract.updateStatus(entryId, newStatusCode));
 }
 
 function createActionsCell(entry) {
@@ -634,7 +612,7 @@ function createActionsCell(entry) {
   setActionButtonEnabled(confirmButton, isAdminWallet && isSoftEntry);
   confirmButton.addEventListener('click', () => handleConfirmEntry(entry.id));
 
-  // Revise Amount shares the same eligibility check as Confirm/Settle.
+  // Revise Amount: only allowed while soft (PENDING, REQUESTED, or COMMITTED).
   const reviseAmountButton = document.createElement('button');
   reviseAmountButton.type = 'button';
   reviseAmountButton.className = 'table-action';
@@ -652,6 +630,46 @@ function createActionsCell(entry) {
   actionsWrap.appendChild(confirmButton);
   actionsWrap.appendChild(reviseAmountButton);
   actionsWrap.appendChild(updateReferenceButton);
+
+  // Status transition buttons: only shown for relevant statuses.
+  if (entry.status === STATUS_REQUESTED) {
+    const commitButton = document.createElement('button');
+    commitButton.type = 'button';
+    commitButton.className = 'table-action';
+    commitButton.textContent = '→ Committed';
+    setActionButtonEnabled(commitButton, isAdminWallet);
+    commitButton.addEventListener('click', () => handleUpdateStatus(entry.id, ENTRY_STATUS_COMMITTED, 'COMMITTED'));
+    actionsWrap.appendChild(commitButton);
+
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.className = 'table-action table-action-danger';
+    cancelButton.textContent = '→ Cancel';
+    setActionButtonEnabled(cancelButton, isAdminWallet);
+    cancelButton.addEventListener('click', () => handleUpdateStatus(entry.id, ENTRY_STATUS_CANCELED, 'CANCELED'));
+    actionsWrap.appendChild(cancelButton);
+  }
+
+  if (entry.status === STATUS_COMMITTED) {
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.className = 'table-action table-action-danger';
+    cancelButton.textContent = '→ Cancel';
+    setActionButtonEnabled(cancelButton, isAdminWallet);
+    cancelButton.addEventListener('click', () => handleUpdateStatus(entry.id, ENTRY_STATUS_CANCELED, 'CANCELED'));
+    actionsWrap.appendChild(cancelButton);
+  }
+
+  if (entry.status === STATUS_PENDING) {
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.className = 'table-action table-action-danger';
+    cancelButton.textContent = '→ Cancel';
+    setActionButtonEnabled(cancelButton, isAdminWallet);
+    cancelButton.addEventListener('click', () => handleUpdateStatus(entry.id, ENTRY_STATUS_CANCELED, 'CANCELED'));
+    actionsWrap.appendChild(cancelButton);
+  }
+
   actionsCell.appendChild(actionsWrap);
   return actionsCell;
 }
@@ -754,11 +772,11 @@ async function validateContractInterface() {
   //    allowing precise detection of ABI drift without relying on full ABI encoding.
   //    Selector values are keccak256(signature)[0:4] — see web/deployment-metadata.json.
   const requiredSelectors = [
-    { selector: '0x7a360e65', name: 'getEntryCount()' },
-    // ADMIN_ROLE() is a simple no-arg view that returns the bytes32 role hash.
-    { selector: '0x75b238fc', name: 'ADMIN_ROLE()' },
+    { selector: '0x7fef036e', name: 'totalEntries()' },
+    // owner() returns the contract owner address — a simple no-arg view.
+    { selector: '0x8da5cb5b', name: 'owner()' },
     // getEntry(uint256) requires an argument; pad with 64 hex zeros (32 bytes = one uint256).
-    // id=0 triggers a revert in the contract. A non-empty revert confirms the selector exists.
+    // id=0 triggers an EntryNotFound revert. A non-empty revert confirms the selector exists.
     {
       selector: '0xbae78d7b',
       name: 'getEntry(uint256)',
@@ -821,19 +839,23 @@ async function getSignerContract() {
 
 async function fetchEntriesFromContract() {
   const { contract } = getReadContract();
-  const totalEntriesRaw = await contract.getEntryCount();
-  const totalEntries = toNumeric(totalEntriesRaw);
+  const totalCount = toNumeric(await contract.totalEntries());
 
-  if (totalEntries === 0) return [];
+  if (totalCount === 0) return [];
 
-  const pageSize = LEDGER_CONFIG.entryPageSize;
+  // Fetch entries individually by ID (1-indexed). The new contract exposes
+  // getEntry(uint256) for single reads; there is no batch getEntries() method.
+  // Entries are fetched in pages to avoid hammering the RPC with too many
+  // simultaneous calls (concurrency limit = entryPageSize).
   const loaded = [];
+  const pageSize = LEDGER_CONFIG.entryPageSize;
 
-  // Use getEntries(offset, limit) for batched reads; avoids N individual calls.
-  for (let offset = 0; offset < totalEntries; offset += pageSize) {
-    const limit = Math.min(pageSize, totalEntries - offset);
-    const pageEntries = await contract.getEntries(offset, limit);
-    loaded.push(...pageEntries.map(normalizeEntry));
+  for (let offset = 1; offset <= totalCount; offset += pageSize) {
+    const end = Math.min(offset + pageSize - 1, totalCount);
+    const ids = [];
+    for (let id = offset; id <= end; id++) ids.push(id);
+    const page = await Promise.all(ids.map((id) => contract.getEntry(id).then(normalizeEntry)));
+    loaded.push(...page);
   }
 
   loaded.sort((a, b) => b.id - a.id);
@@ -880,19 +902,16 @@ async function refreshWalletState() {
     return;
   }
 
-  let isAdminByRole = false;
+  let isOwner = false;
   try {
     const readContract = getReadContract().contract;
-    const adminRole = await readContract.ADMIN_ROLE();
-    isAdminByRole = await readContract.hasRole(adminRole, currentAccount);
+    const ownerAddress = await readContract.owner();
+    isOwner = ownerAddress.toLowerCase() === currentAccount.toLowerCase();
   } catch (error) {
     console.error(error);
   }
 
-  const normalizedAccount = currentAccount.toLowerCase();
-  const isAllowlisted = LEDGER_CONFIG.adminAllowlist.some((address) => address.toLowerCase() === normalizedAccount);
-
-  isAdminWallet = Boolean(isAdminByRole || isAllowlisted);
+  isAdminWallet = isOwner;
   setFormEnabled(isAdminWallet);
 
   if (isAdminWallet) {
@@ -993,7 +1012,7 @@ async function handleEntrySubmit(event) {
   clearFieldErrors();
 
   if (!isAdminWallet) {
-    setTxStatus('Only the admin wallet can add entries.', 'error');
+    setTxStatus('Only the contract owner can add entries.', 'error');
     return;
   }
 
@@ -1006,35 +1025,19 @@ async function handleEntrySubmit(event) {
   const entryTypeValue = values.type === 'OUTGOING' ? TX_TYPE_OUTGOING : TX_TYPE_INCOMING;
   // Map the form status selection to the on-chain enum uint8.
   const entryStatusValue = values.status === 'REQUESTED' ? ENTRY_STATUS_REQUESTED : ENTRY_STATUS_PENDING;
-  // The deployed contract enforces assetDecimals == 18 for the native asset sentinel address.
-  // Using any other value causes an on-chain revert: "Native must use 18 decimals".
-  // Convert the user-entered amount (ETH units) to wei so the on-chain amount matches
-  // the 18-decimal precision that NATIVE_ASSET entries require.
-  const assetDecimals = NATIVE_ASSET_DECIMALS;
-  let amountWei;
-  try {
-    amountWei = window.ethers.parseEther(String(values.amount));
-  } catch {
-    setFieldError('amount', 'Amount is not a valid ETH value.');
-    return;
-  }
+  // Amount is stored as a plain whole-number uint256 (no decimal conversion needed).
+  const amountValue = BigInt(Math.round(values.amount));
 
-  // Pre-submit guard: catch sub-wei amounts that slip past the > 0 check in
-  // parseSubmissionValues (e.g. 1e-20 ETH → 0 wei after parseEther truncation).
-  // These are positive floating-point values that underflow to zero in 18-decimal
-  // fixed-point arithmetic, so the simpler amount <= 0 guard above cannot catch them.
-  if (amountWei === 0n) {
+  if (amountValue === 0n) {
     setFieldError('amount', 'Amount must be greater than zero.');
     return;
   }
 
   await runTransaction('Entry creation', () =>
-    signerContract.addEntry(
+    signerContract.createEntry(
       entryTypeValue,
       entryStatusValue,
-      nativeAssetAddress,
-      assetDecimals,
-      amountWei,
+      amountValue,
       values.category,
       values.description,
       values.proofUrl,
@@ -1077,14 +1080,6 @@ function bindWalletEvents() {
 }
 
 async function init() {
-  // Cache the native-asset sentinel address used by addEntry for off-chain records.
-  try {
-    const { contract } = getReadContract();
-    nativeAssetAddress = await contract.NATIVE_ASSET();
-  } catch {
-    // Keep the zero-address fallback if the RPC is unavailable at startup.
-  }
-
   if (walletConnectBtnEl) {
     walletConnectBtnEl.addEventListener('click', connectWallet);
   }

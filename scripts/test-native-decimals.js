@@ -2,11 +2,12 @@
 /**
  * test-native-decimals.js
  *
- * Regression tests for native-asset ledger entry logic:
- *   - NATIVE_ASSET_DECIMALS must equal 18
- *   - Amount conversion from ETH to wei (parseEther equivalent)
+ * Regression tests for the ProjectLedger v2 frontend logic:
+ *   - Amount handling: plain uint256, no ETH/wei conversion needed
+ *   - BigInt conversion for on-chain calls
  *   - Error message extraction prioritises decoded revert reason
- *   - Form validation: decimal amounts accepted, non-positive amounts rejected
+ *   - Form validation: positive integer amounts accepted, non-positive rejected
+ *   - Status constants match contract enum order
  *
  * Usage:
  *   node scripts/test-native-decimals.js
@@ -34,80 +35,139 @@ function assert(condition, description) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 1. Verify NATIVE_ASSET_DECIMALS constant is present and set to 18
-// ---------------------------------------------------------------------------
-console.log('\n=== 1. NATIVE_ASSET_DECIMALS constant ===');
 const source = fs.readFileSync(APP_JS, 'utf8');
 
-const decimalsMatch = source.match(/const NATIVE_ASSET_DECIMALS\s*=\s*(\d+)/);
-assert(decimalsMatch !== null, 'NATIVE_ASSET_DECIMALS constant is defined in app.js');
-if (decimalsMatch) {
-  assert(
-    Number(decimalsMatch[1]) === 18,
-    `NATIVE_ASSET_DECIMALS === 18 (found ${decimalsMatch[1]})`,
-  );
-}
-
 // ---------------------------------------------------------------------------
-// 2. Verify handleEntrySubmit uses NATIVE_ASSET_DECIMALS (not literal 0)
+// 1. Verify new contract address is set
 // ---------------------------------------------------------------------------
-console.log('\n=== 2. handleEntrySubmit uses NATIVE_ASSET_DECIMALS ===');
-// The old bug: assetDecimals = 0 was hardcoded.
-// The fix: assetDecimals = NATIVE_ASSET_DECIMALS.
+console.log('\n=== 1. Contract address updated to new deployment ===');
 assert(
-  !source.includes('const assetDecimals = 0'),
-  'handleEntrySubmit does not hardcode assetDecimals = 0',
+  source.includes('0x44500FFd99B621620f393FCdbcF55D5137A55A23'),
+  'LEDGER_CONFIG.contractAddress is the new deployment address',
 );
 assert(
-  source.includes('assetDecimals = NATIVE_ASSET_DECIMALS'),
-  'handleEntrySubmit assigns assetDecimals = NATIVE_ASSET_DECIMALS',
+  !source.includes('0x942CcE8384a9d9bd2842365395d7a912e1a5322c'),
+  'Old contract address is not present in app.js',
 );
 
 // ---------------------------------------------------------------------------
-// 3. Verify parseEther is used to convert the user amount to wei
+// 2. Verify new ABI functions are present (no old functions)
 // ---------------------------------------------------------------------------
-console.log('\n=== 3. Amount converted to wei with parseEther ===');
+console.log('\n=== 2. New ABI — createEntry present, addEntry absent ===');
 assert(
-  source.includes('parseEther'),
-  'app.js calls ethers.parseEther() to convert ETH amount to wei',
+  source.includes("'function createEntry("),
+  'PROJECT_LEDGER_ABI includes createEntry',
+);
+assert(
+  !source.includes("'function addEntry("),
+  'PROJECT_LEDGER_ABI does not include old addEntry',
+);
+assert(
+  source.includes("'function totalEntries()"),
+  'PROJECT_LEDGER_ABI includes totalEntries()',
+);
+assert(
+  !source.includes("'function getEntryCount()"),
+  'PROJECT_LEDGER_ABI does not include old getEntryCount()',
+);
+assert(
+  source.includes("'function owner()"),
+  'PROJECT_LEDGER_ABI includes owner()',
+);
+assert(
+  !source.includes("'function ADMIN_ROLE()"),
+  'PROJECT_LEDGER_ABI does not include old ADMIN_ROLE()',
+);
+assert(
+  source.includes("'function updateStatus("),
+  'PROJECT_LEDGER_ABI includes updateStatus()',
 );
 
 // ---------------------------------------------------------------------------
-// 4. Verify the integer-only form validation was removed
+// 3. Verify plain uint256 amount handling (no ETH/wei conversion)
 // ---------------------------------------------------------------------------
-console.log('\n=== 4. Decimal amounts allowed (no Number.isInteger guard) ===');
-// The old validation rejected non-integer amounts:
-//   "Amount must be a whole number."
-// The fix removes this so decimal ETH values (e.g. 1.5 ETH) are accepted.
+console.log('\n=== 3. Amount handling: plain uint256, no parseEther ===');
 assert(
-  !source.includes('Number.isInteger(amount)'),
-  'parseSubmissionValues no longer rejects non-integer amounts',
+  !source.includes('NATIVE_ASSET_DECIMALS'),
+  'NATIVE_ASSET_DECIMALS constant is not present (removed with ETH/wei model)',
 );
-// The "whole number" restriction was removed from the entry creation form (parseSubmissionValues).
-// It still exists in handleReviseAmount (a separate prompt for revising existing entries).
-// Check that parseSubmissionValues itself no longer contains the old rejection string.
-const parseFnMatch = source.match(/function parseSubmissionValues\(\)[\s\S]*?^}/m);
-const parseFnSource = parseFnMatch ? parseFnMatch[0] : '';
 assert(
-  !parseFnSource.includes('whole number'),
-  'parseSubmissionValues function body does not contain whole-number rejection',
+  !source.includes('parseEther'),
+  'app.js does not call parseEther (amounts are plain uint256 now)',
+);
+assert(
+  source.includes('BigInt(Math.round(values.amount))'),
+  'handleEntrySubmit converts amount to BigInt for uint256 on-chain call',
 );
 
 // ---------------------------------------------------------------------------
-// 5. Verify non-positive amounts are still rejected
+// 4. Verify STATUS_CONFIRMED replaces STATUS_SETTLED
 // ---------------------------------------------------------------------------
-console.log('\n=== 5. Non-positive amount validation still present ===');
+console.log('\n=== 4. STATUS_CONFIRMED replaces STATUS_SETTLED ===');
+assert(
+  source.includes("const STATUS_CONFIRMED = 'CONFIRMED'"),
+  'STATUS_CONFIRMED constant is defined',
+);
+assert(
+  !source.includes("const STATUS_SETTLED"),
+  'STATUS_SETTLED constant is not present',
+);
+assert(
+  source.includes("STATUS_CONFIRMED"),
+  'calculateSummary and normalizeEntry use STATUS_CONFIRMED',
+);
+
+// ---------------------------------------------------------------------------
+// 5. Verify status enum constants match contract
+// ---------------------------------------------------------------------------
+console.log('\n=== 5. Status enum constants match contract order ===');
+assert(
+  source.includes('const ENTRY_STATUS_PENDING = 0'),
+  'ENTRY_STATUS_PENDING === 0',
+);
+assert(
+  source.includes('const ENTRY_STATUS_CONFIRMED = 1'),
+  'ENTRY_STATUS_CONFIRMED === 1',
+);
+assert(
+  source.includes('const ENTRY_STATUS_REQUESTED = 2'),
+  'ENTRY_STATUS_REQUESTED === 2',
+);
+assert(
+  source.includes('const ENTRY_STATUS_COMMITTED = 3'),
+  'ENTRY_STATUS_COMMITTED === 3',
+);
+assert(
+  source.includes('const ENTRY_STATUS_CANCELED = 4'),
+  'ENTRY_STATUS_CANCELED === 4',
+);
+
+// ---------------------------------------------------------------------------
+// 6. Verify updateStatus action is present in code
+// ---------------------------------------------------------------------------
+console.log('\n=== 6. handleUpdateStatus function present ===');
+assert(
+  source.includes('async function handleUpdateStatus('),
+  'handleUpdateStatus function is defined',
+);
+assert(
+  source.includes('signerContract.updateStatus('),
+  'handleUpdateStatus calls signerContract.updateStatus()',
+);
+
+// ---------------------------------------------------------------------------
+// 7. Verify non-positive amount validation still present
+// ---------------------------------------------------------------------------
+console.log('\n=== 7. Non-positive amount validation still present ===');
 assert(
   source.includes('amount <= 0'),
   'parseSubmissionValues still rejects amounts <= 0',
 );
 
 // ---------------------------------------------------------------------------
-// 6. Verify error message extraction includes error.reason
+// 8. Verify error message extraction includes error.reason
 // ---------------------------------------------------------------------------
-console.log('\n=== 6. getErrorMessage surfaces error.reason ===');
-// Inline the getErrorMessage logic for testing without DOM.
+console.log('\n=== 8. getErrorMessage surfaces error.reason ===');
 function getErrorMessage(error, fallback) {
   return (
     error?.reason ||
@@ -118,9 +178,9 @@ function getErrorMessage(error, fallback) {
   );
 }
 
-const revertError = { reason: 'Native must use 18 decimals' };
+const revertError = { reason: 'EmptyCategory()' };
 assert(
-  getErrorMessage(revertError) === 'Native must use 18 decimals',
+  getErrorMessage(revertError) === 'EmptyCategory()',
   'getErrorMessage returns error.reason for on-chain revert',
 );
 
@@ -147,50 +207,47 @@ assert(
   'getErrorMessage uses fallback when error is null',
 );
 
-// Verify app.js source also has the reason check.
 assert(
   source.includes('error?.reason'),
   'getErrorMessage in app.js includes error?.reason extraction',
 );
 
 // ---------------------------------------------------------------------------
-// 7. ETH-to-wei conversion correctness (pure arithmetic, no ethers dependency)
+// 9. Verify owner() used instead of ADMIN_ROLE()/hasRole()
 // ---------------------------------------------------------------------------
-console.log('\n=== 7. ETH-to-wei conversion correctness ===');
-// Replicate what ethers.parseEther does for simple values.
-function parseEtherSimple(ethString) {
-  const [whole = '0', fraction = ''] = ethString.split('.');
-  const paddedFraction = fraction.padEnd(18, '0').slice(0, 18);
-  return BigInt(whole) * BigInt(10 ** 18) + BigInt(paddedFraction);
-}
-
+console.log('\n=== 9. owner() used for admin check (not role-based) ===');
 assert(
-  parseEtherSimple('1') === BigInt('1000000000000000000'),
-  'parseEther("1") == 1e18 wei',
+  source.includes('readContract.owner()'),
+  'refreshWalletState calls owner() to determine admin',
 );
 assert(
-  parseEtherSimple('1.5') === BigInt('1500000000000000000'),
-  'parseEther("1.5") == 1.5e18 wei',
+  !source.includes('ADMIN_ROLE()'),
+  'No references to ADMIN_ROLE() remain in app.js',
 );
 assert(
-  parseEtherSimple('100') === BigInt('100000000000000000000'),
-  'parseEther("100") == 1e20 wei',
+  !source.includes('hasRole('),
+  'No references to hasRole() remain in app.js',
 );
 
-// Verify that dividing wei back by 10^18 restores the human-readable amount
-// (as normalizeEntry does for display).
-const weiFor1Eth = BigInt('1000000000000000000');
-const displayAmount = Number(weiFor1Eth.toString()) / 10 ** 18;
+// ---------------------------------------------------------------------------
+// 10. Verify fetchEntriesFromContract uses totalEntries() + getEntry(id)
+// ---------------------------------------------------------------------------
+console.log('\n=== 10. fetchEntriesFromContract uses new API ===');
 assert(
-  displayAmount === 1,
-  'normalizeEntry display: 1e18 wei / 10^18 === 1 (ETH)',
+  source.includes('contract.totalEntries()'),
+  'fetchEntriesFromContract calls totalEntries()',
 );
-
-const weiFor1_5 = BigInt('1500000000000000000');
-const display1_5 = Number(weiFor1_5.toString()) / 10 ** 18;
 assert(
-  Math.abs(display1_5 - 1.5) < 1e-9,
-  'normalizeEntry display: 1.5e18 wei / 10^18 === 1.5 (ETH)',
+  source.includes('contract.getEntry(id)'),
+  'fetchEntriesFromContract calls getEntry(id) per entry',
+);
+assert(
+  !source.includes('contract.getEntryCount()'),
+  'No old getEntryCount() call remains',
+);
+assert(
+  !source.includes('contract.getEntries('),
+  'No old getEntries() batch call remains',
 );
 
 // ---------------------------------------------------------------------------
@@ -204,3 +261,4 @@ if (failed > 0) {
 }
 console.log('\nAll tests passed.');
 process.exit(0);
+
