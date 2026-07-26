@@ -178,6 +178,10 @@ const ENTRY_STATUS_REQUESTED = 2;
 // used as creation targets from the UI (set via updateStatus after creation).
 // Fallback zero-address used as nativeAssetAddress before NATIVE_ASSET() resolves.
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+// The deployed contract enforces assetDecimals == 18 for any entry whose asset address
+// matches the NATIVE_ASSET() sentinel.  Sending any other value causes an on-chain revert:
+//   "Native must use 18 decimals"
+const NATIVE_ASSET_DECIMALS = 18;
 
 const ledgerBody = document.getElementById('ledger-body');
 const totalRaisedEl = document.getElementById('total-raised');
@@ -231,7 +235,11 @@ function formatAmount(value) {
 }
 
 function getErrorMessage(error, fallback = 'An unexpected error occurred. Please try again.') {
+  // Prefer the decoded revert reason (e.g. "Native must use 18 decimals") when available.
+  // ethers.js v6 surfaces this as `reason`; also try `shortMessage` for ABI-decoded errors,
+  // then the embedded JSON-RPC error message, and finally the raw Error message.
   return (
+    error?.reason ||
     error?.shortMessage ||
     error?.info?.error?.message ||
     error?.message ||
@@ -947,11 +955,8 @@ function parseSubmissionValues() {
   } else if (Number.isNaN(amount)) {
     setFieldError('amount', 'Amount must be a valid number.');
     hasError = true;
-  } else if (!Number.isInteger(amount)) {
-    setFieldError('amount', 'Amount must be a whole number.');
-    hasError = true;
-  } else if (amount < 1) {
-    setFieldError('amount', 'Amount must be a number greater than or equal to 1.');
+  } else if (amount <= 0) {
+    setFieldError('amount', 'Amount must be greater than zero.');
     hasError = true;
   }
 
@@ -1001,9 +1006,25 @@ async function handleEntrySubmit(event) {
   const entryTypeValue = values.type === 'OUTGOING' ? TX_TYPE_OUTGOING : TX_TYPE_INCOMING;
   // Map the form status selection to the on-chain enum uint8.
   const entryStatusValue = values.status === 'REQUESTED' ? ENTRY_STATUS_REQUESTED : ENTRY_STATUS_PENDING;
-  // asset is the native-asset sentinel from the contract,
-  // with assetDecimals=0 so whole-number dollar amounts are stored as-is.
-  const assetDecimals = 0;
+  // The deployed contract enforces assetDecimals == 18 for the native asset sentinel address.
+  // Using any other value causes an on-chain revert: "Native must use 18 decimals".
+  // Convert the user-entered amount (ETH units) to wei so the on-chain amount matches
+  // the 18-decimal precision that NATIVE_ASSET entries require.
+  const assetDecimals = NATIVE_ASSET_DECIMALS;
+  let amountWei;
+  try {
+    amountWei = window.ethers.parseEther(String(values.amount));
+  } catch {
+    setFieldError('amount', 'Amount is not a valid ETH value.');
+    return;
+  }
+
+  // Pre-submit guard: reject if the converted wei amount is zero (e.g. rounding of
+  // an extremely small input that is not representable in 18 decimal places).
+  if (amountWei === 0n) {
+    setFieldError('amount', 'Amount must be greater than zero.');
+    return;
+  }
 
   await runTransaction('Entry creation', () =>
     signerContract.addEntry(
@@ -1011,7 +1032,7 @@ async function handleEntrySubmit(event) {
       entryStatusValue,
       nativeAssetAddress,
       assetDecimals,
-      values.amount,
+      amountWei,
       values.category,
       values.description,
       values.proofUrl,
