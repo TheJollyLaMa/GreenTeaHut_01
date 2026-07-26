@@ -91,7 +91,7 @@
             <div class="eq-value" id="balance">Loading...</div>
           </div>
         </div>
-        <p class="summary-note">Settled totals shown. Ghostly numbers above include pending &amp; requested amounts.</p>
+        <p class="summary-note">Confirmed totals shown. Ghostly numbers above include pending &amp; requested amounts.</p>
       </section>
 
       <section class="roadmap-section" aria-label="Project Roadmap">
@@ -152,7 +152,7 @@
               <option value="PENDING">Pending</option>
               <option value="REQUESTED">Requested</option>
               <option value="COMMITTED">Committed</option>
-              <option value="SETTLED">Settled</option>
+              <option value="CONFIRMED">Confirmed</option>
               <option value="CANCELED">Canceled</option>
             </select>
           </label>
@@ -209,8 +209,8 @@
             </label>
 
             <label for="entry-amount">
-              Amount (ETH)
-              <input id="entry-amount" name="amount" type="number" min="0.000000000000000001" step="any" placeholder="e.g. 1.5" required />
+              Amount (USD)
+              <input id="entry-amount" name="amount" type="number" min="1" step="1" placeholder="e.g. 1500" required />
               <span id="entry-amount-error" class="field-error" aria-live="polite"></span>
             </label>
 

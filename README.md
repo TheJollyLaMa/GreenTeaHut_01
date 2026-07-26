@@ -12,17 +12,18 @@ Project funding and spending are tracked alongside milestone progress and displa
 
 ### Contract Deployment
 - **Contract:** `ProjectLedger` (`contracts/ProjectLedger.sol`)
-- **Address:** `0x942CcE8384a9d9bd2842365395d7a912e1a5322c`
+- **Address:** `0x44500FFd99B621620f393FCdbcF55D5137A55A23`
 - **Network:** Optimism (Chain ID `10`)
-- **Explorer:** https://optimistic.etherscan.io/address/0x942CcE8384a9d9bd2842365395d7a912e1a5322c
+- **Explorer:** https://optimistic.etherscan.io/address/0x44500FFd99B621620f393FCdbcF55D5137A55A23
 
 ### Run frontend with the live contract
 1. Open the live frontend link above (or serve `/web` locally with any static file server).
 2. Use MetaMask on **Optimism** (chain ID `10`) to avoid wrong-network errors.
-3. Admin writes are enabled for the deployed contract owner wallet and this allowlisted admin wallet:
-   - `0x807061DF657A7697c04045dA7d16D941861cAABc`
-4. Use **Add Entry to the Books** to create a `PENDING` on-chain entry.
+3. Admin writes are enabled for the deployed contract **owner** wallet only.
+4. Use **Add Entry to the Books** to create a `PENDING` or `REQUESTED` on-chain entry.
 5. Use **Confirm/Settle** in the ledger table with a proof URL to settle entries.
+6. Use **→ Committed** / **→ Cancel** buttons to transition requested entries.
+7. Use **Revise Amount** to update an estimate before settlement (requires a reason).
 
 ### Goals
 1. Transparent accounting
@@ -31,9 +32,10 @@ Project funding and spending are tracked alongside milestone progress and displa
 4. Ongoing monthly updates
 
 ### Settlement flow
-- New ledger entries begin on-chain as `PENDING`.
-- Entries move to `SETTLED` once a proof/reference URL is available.
-- On-chain contract logic uses `CONFIRMED` as its settled status (displayed in the frontend as `SETTLED`). See `contracts/ProjectLedger.sol`.
+- New incoming entries begin as `PENDING`; new outgoing entries begin as `REQUESTED`.
+- Outgoing entries can be moved to `COMMITTED` (approved) or `CANCELED` (voided).
+- Any soft entry can be `CONFIRMED` (settled) once a proof/reference URL is available.
+- Balances distinguish **projected** (includes soft entries) from **confirmed/settled** totals.
 
 ### Updating the frontend ABI
 The frontend ABI in `web/app.js` (`PROJECT_LEDGER_ABI`) must stay in sync with the deployed contract.
@@ -56,6 +58,6 @@ in the ledger table will name the specific selector that is missing.
 
 | Network  | Chain ID | Contract address                             | Compiler  | ABI version | Artifact                                         |
 |----------|----------|----------------------------------------------|-----------|-------------|--------------------------------------------------|
-| Optimism | 10       | `0x942CcE8384a9d9bd2842365395d7a912e1a5322c` | solc 0.8.30 | 1.0.0     | `contracts_ProjectLedger_sol_ProjectLedger.bin`  |
+| Optimism | 10       | `0x44500FFd99B621620f393FCdbcF55D5137A55A23` | solc 0.8.20 | 2.0.0     | `contracts_ProjectLedger_sol_ProjectLedger.bin`  |
 
 ABI provenance: `web/deployment-metadata.json` records the canonical address, compiler version, and required function selectors for each network. `scripts/validate-abi.js` cross-checks `web/app.js` against this file and can be run in CI.
