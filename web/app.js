@@ -154,6 +154,7 @@ const PROJECT_LEDGER_ABI = [
   'function confirmEntry(uint256 id, string referenceURI)',
   'function updateReferenceURI(uint256 id, string newReferenceURI)',
   'function updateStatus(uint256 id, uint8 newStatus)',
+  'function updatePendingAmount(uint256 id, uint256 newAmount, string reason, string referenceURI)',
   // Write — asset flows
   'function depositNative(string category, string description, string referenceURI) payable returns (uint256 entryId)',
   'function depositERC20(address token, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
@@ -163,12 +164,18 @@ const PROJECT_LEDGER_ABI = [
 
 const STATUS_PENDING = 'PENDING';
 const STATUS_SETTLED = 'SETTLED';
+const STATUS_REQUESTED = 'REQUESTED';
+const STATUS_COMMITTED = 'COMMITTED';
+const STATUS_CANCELED = 'CANCELED';
 
 // TxType enum values in the deployed ProjectLedger contract.
 const TX_TYPE_INCOMING = 0;
 const TX_TYPE_OUTGOING = 1;
-// Status enum values (on-chain uint8).
+// Status enum values (on-chain uint8). Order must match EntryStatus in ProjectLedger.sol.
 const ENTRY_STATUS_PENDING = 0;
+const ENTRY_STATUS_REQUESTED = 2;
+// ENTRY_STATUS_COMMITTED = 3 and ENTRY_STATUS_CANCELED = 4 are available but not
+// used as creation targets from the UI (set via updateStatus after creation).
 // Fallback zero-address used as nativeAssetAddress before NATIVE_ASSET() resolves.
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -189,6 +196,7 @@ const entryAmountEl = document.getElementById('entry-amount');
 const entryCategoryEl = document.getElementById('entry-category');
 const entryDescriptionEl = document.getElementById('entry-description');
 const entryProofEl = document.getElementById('entry-proof');
+const entryStatusEl = document.getElementById('entry-status');
 const entryFormControls = entryFormEl ? Array.from(entryFormEl.elements) : [];
 const walletConnectBtnEl = document.getElementById('wallet-connect-btn');
 const walletStatusEl = document.getElementById('wallet-status');
@@ -381,7 +389,18 @@ function setFormEnabled(enabled) {
 }
 
 function normalizeEntry(entry) {
-  const status = Number(entry.status) === 1 ? STATUS_SETTLED : STATUS_PENDING;
+  // Map on-chain uint8 status to a display string.
+  // Values must match EntryStatus enum order in ProjectLedger.sol:
+  //   0 = PENDING, 1 = CONFIRMED (→ SETTLED), 2 = REQUESTED, 3 = COMMITTED, 4 = CANCELED
+  const ON_CHAIN_STATUS_MAP = {
+    0: STATUS_PENDING,
+    1: STATUS_SETTLED,
+    2: STATUS_REQUESTED,
+    3: STATUS_COMMITTED,
+    4: STATUS_CANCELED,
+  };
+  const statusCode = Number(entry.status);
+  const status = ON_CHAIN_STATUS_MAP[statusCode] ?? STATUS_PENDING;
   const type = Number(entry.txType) === TX_TYPE_OUTGOING ? 'OUTGOING' : 'INCOMING';
   // Scale the raw on-chain amount by the asset's decimal places so the UI
   // displays a human-readable value (e.g. 1e18 wei → 1 ETH, or whole-dollar
@@ -408,7 +427,7 @@ function updateSummaryDisplay(summary) {
   balanceEl.textContent = summary.balance;
   if (pendingRaisedEl) pendingRaisedEl.textContent = summary.pendingRaised;
   if (pendingSpentEl) pendingSpentEl.textContent = summary.pendingSpent;
-  if (requestSpentEl) requestSpentEl.textContent = '';
+  if (requestSpentEl) requestSpentEl.textContent = summary.requestedSpent || '';
   if (pendingBalanceEl) pendingBalanceEl.textContent = summary.pendingBalance;
 }
 
@@ -429,17 +448,23 @@ function calculateSummary(allEntries) {
     .filter((e) => e.type === 'OUTGOING' && e.status === STATUS_PENDING)
     .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
+  // REQUESTED and COMMITTED are soft outgoing entries — expected future outflows.
+  const requestedSpent = allEntries
+    .filter((e) => e.type === 'OUTGOING' && (e.status === STATUS_REQUESTED || e.status === STATUS_COMMITTED))
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
   const balance = settledRaised - settledSpent;
   const projectedRaised = settledRaised + pendingRaised;
-  const projectedSpent = settledSpent + pendingSpent;
+  const projectedSpent = settledSpent + pendingSpent + requestedSpent;
   const projectedBalance = projectedRaised - projectedSpent;
-  const hasGhostBalance = pendingRaised > 0 || pendingSpent > 0;
+  const hasGhostBalance = pendingRaised > 0 || pendingSpent > 0 || requestedSpent > 0;
 
   updateSummaryDisplay({
     totalRaised: formatAmount(settledRaised),
     pendingRaised: pendingRaised > 0 ? `(${formatAmount(projectedRaised)})` : '',
     totalSpent: formatAmount(settledSpent),
-    pendingSpent: pendingSpent > 0 ? `(${formatAmount(projectedSpent)})` : '',
+    pendingSpent: pendingSpent > 0 ? `(${formatAmount(settledSpent + pendingSpent)})` : '',
+    requestedSpent: requestedSpent > 0 ? `(${formatAmount(settledSpent + requestedSpent)})` : '',
     balance: formatAmount(balance),
     pendingBalance: hasGhostBalance ? `(${formatAmount(projectedBalance)})` : '',
   });
@@ -465,6 +490,9 @@ function getStatusBadge(status) {
   const classMap = {
     [STATUS_SETTLED]: 'status-settled',
     [STATUS_PENDING]: 'status-pending',
+    [STATUS_REQUESTED]: 'status-requested',
+    [STATUS_COMMITTED]: 'status-committed',
+    [STATUS_CANCELED]: 'status-canceled',
   };
   badge.className = `status-badge ${classMap[status] || 'status-pending'}`;
   badge.textContent = status || STATUS_PENDING;
@@ -555,17 +583,56 @@ async function handleUpdateReference(entryId, currentReference) {
   await runTransaction('Reference update', () => signerContract.updateReferenceURI(entryId, nextReference.trim()));
 }
 
+async function handleReviseAmount(entryId, currentAmount) {
+  if (!isAdminWallet) return;
+  const newAmountRaw = window.prompt(`Revise amount for entry #${entryId}.\nCurrent amount: ${formatAmount(currentAmount)}\n\nEnter new amount (whole number, USD):`);
+  if (newAmountRaw === null) return;
+  const newAmount = Number(newAmountRaw.trim());
+  if (!newAmountRaw.trim() || !Number.isInteger(newAmount) || newAmount < 1) {
+    setTxStatus('Amount must be a whole number greater than or equal to 1.', 'error');
+    return;
+  }
+  const reason = window.prompt('Reason for this revision (required):');
+  if (reason === null) return;
+  if (!reason.trim()) {
+    setTxStatus('A reason is required to revise an entry amount.', 'error');
+    return;
+  }
+  const referenceUrl = window.prompt('Supporting reference URL (optional, leave blank to skip):') || '';
+  if (referenceUrl && !isValidUrl(referenceUrl.trim())) {
+    setTxStatus('Reference URL must start with http:// or https://.', 'error');
+    return;
+  }
+  const signerContract = await getSignerContract();
+  if (!signerContract) return;
+  await runTransaction(
+    'Amount revision',
+    () => signerContract.updatePendingAmount(entryId, newAmount, reason.trim(), referenceUrl.trim()),
+  );
+}
+
 function createActionsCell(entry) {
   const actionsCell = document.createElement('td');
   const actionsWrap = document.createElement('div');
   actionsWrap.className = 'actions-wrap';
 
+  // isSoftEntry: true for any status that can still be revised or settled.
+  const isSoftEntry = entry.status === STATUS_PENDING || entry.status === STATUS_REQUESTED || entry.status === STATUS_COMMITTED;
+
   const confirmButton = document.createElement('button');
   confirmButton.type = 'button';
   confirmButton.className = 'table-action';
   confirmButton.textContent = 'Confirm/Settle';
-  setActionButtonEnabled(confirmButton, isAdminWallet && entry.status === STATUS_PENDING);
+  setActionButtonEnabled(confirmButton, isAdminWallet && isSoftEntry);
   confirmButton.addEventListener('click', () => handleConfirmEntry(entry.id));
+
+  // Revise Amount shares the same eligibility check as Confirm/Settle.
+  const reviseAmountButton = document.createElement('button');
+  reviseAmountButton.type = 'button';
+  reviseAmountButton.className = 'table-action';
+  reviseAmountButton.textContent = 'Revise Amount';
+  setActionButtonEnabled(reviseAmountButton, isAdminWallet && isSoftEntry);
+  reviseAmountButton.addEventListener('click', () => handleReviseAmount(entry.id, entry.amount));
 
   const updateReferenceButton = document.createElement('button');
   updateReferenceButton.type = 'button';
@@ -575,6 +642,7 @@ function createActionsCell(entry) {
   updateReferenceButton.addEventListener('click', () => handleUpdateReference(entry.id, entry.reference));
 
   actionsWrap.appendChild(confirmButton);
+  actionsWrap.appendChild(reviseAmountButton);
   actionsWrap.appendChild(updateReferenceButton);
   actionsCell.appendChild(actionsWrap);
   return actionsCell;
@@ -863,6 +931,8 @@ function parseSubmissionValues() {
   const category = entryCategoryEl.value.trim();
   const description = entryDescriptionEl.value.trim();
   const proofUrl = entryProofEl.value.trim();
+  // Read selected soft-status from the form (defaults to PENDING if element absent).
+  const statusValue = entryStatusEl ? entryStatusEl.value : 'PENDING';
 
   let hasError = false;
 
@@ -908,6 +978,7 @@ function parseSubmissionValues() {
       category,
       description,
       proofUrl,
+      status: statusValue,
     },
   };
 }
@@ -928,14 +999,16 @@ async function handleEntrySubmit(event) {
   if (!signerContract) return;
 
   const entryTypeValue = values.type === 'OUTGOING' ? TX_TYPE_OUTGOING : TX_TYPE_INCOMING;
-  // ENTRY_STATUS_PENDING = 0; asset is the native-asset sentinel from the contract,
+  // Map the form status selection to the on-chain enum uint8.
+  const entryStatusValue = values.status === 'REQUESTED' ? ENTRY_STATUS_REQUESTED : ENTRY_STATUS_PENDING;
+  // asset is the native-asset sentinel from the contract,
   // with assetDecimals=0 so whole-number dollar amounts are stored as-is.
   const assetDecimals = 0;
 
   await runTransaction('Entry creation', () =>
     signerContract.addEntry(
       entryTypeValue,
-      ENTRY_STATUS_PENDING,
+      entryStatusValue,
       nativeAssetAddress,
       assetDecimals,
       values.amount,

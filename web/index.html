@@ -150,7 +150,10 @@
             <select id="status-filter">
               <option value="ALL">All</option>
               <option value="PENDING">Pending</option>
+              <option value="REQUESTED">Requested</option>
+              <option value="COMMITTED">Committed</option>
               <option value="SETTLED">Settled</option>
+              <option value="CANCELED">Canceled</option>
             </select>
           </label>
 
@@ -185,7 +188,7 @@
 
         <section class="entry-section" aria-label="Add Entry to the Books">
           <h2 class="ledger-heading">Add Entry to the Books</h2>
-          <p class="entry-helper">New entries are added on-chain as PENDING by default. Confirm/Settle from the table when proof is ready.</p>
+          <p class="entry-helper">New entries are added on-chain as PENDING (expected incoming) or REQUESTED (expected outgoing). Confirm/Settle from the table when proof is ready. Use "Revise Amount" to update an estimate before settlement.</p>
           <form id="entry-form" class="entry-form" novalidate>
             <label for="entry-type">
               Type
@@ -195,6 +198,14 @@
                 <option value="OUTGOING">OUTGOING</option>
               </select>
               <span id="entry-type-error" class="field-error" aria-live="polite"></span>
+            </label>
+
+            <label for="entry-status">
+              Status
+              <select id="entry-status" name="status">
+                <option value="PENDING">PENDING (expected inflow)</option>
+                <option value="REQUESTED">REQUESTED (expected outflow)</option>
+              </select>
             </label>
 
             <label for="entry-amount">
