@@ -1019,8 +1019,10 @@ async function handleEntrySubmit(event) {
     return;
   }
 
-  // Pre-submit guard: reject if the converted wei amount is zero (e.g. rounding of
-  // an extremely small input that is not representable in 18 decimal places).
+  // Pre-submit guard: catch sub-wei amounts that slip past the > 0 check in
+  // parseSubmissionValues (e.g. 1e-20 ETH → 0 wei after parseEther truncation).
+  // These are positive floating-point values that underflow to zero in 18-decimal
+  // fixed-point arithmetic, so the simpler amount <= 0 guard above cannot catch them.
   if (amountWei === 0n) {
     setFieldError('amount', 'Amount must be greater than zero.');
     return;
