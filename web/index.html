@@ -73,20 +73,26 @@
       <section class="equation-section" aria-label="Financial summary">
         <div class="equation">
           <div class="eq-item eq-raised">
-            <div class="eq-ghost eq-ghost-pending" id="pending-raised" aria-label="With pending transactions"></div>
+            <div class="eq-ghost-group">
+              <div class="eq-ghost eq-ghost-pending" id="pending-raised" aria-label="With pending transactions"></div>
+            </div>
             <div class="eq-label">Total Raised</div>
             <div class="eq-value" id="total-raised">Loading...</div>
           </div>
           <div class="eq-op" aria-hidden="true">−</div>
           <div class="eq-item eq-spent">
-            <div class="eq-ghost eq-ghost-request" id="request-spent" aria-label="Requested amounts"></div>
-            <div class="eq-ghost eq-ghost-pending" id="pending-spent" aria-label="With pending transactions"></div>
+            <div class="eq-ghost-group">
+              <div class="eq-ghost eq-ghost-request" id="request-spent" aria-label="Requested amounts"></div>
+              <div class="eq-ghost eq-ghost-pending" id="pending-spent" aria-label="With pending transactions"></div>
+            </div>
             <div class="eq-label">Total Spent</div>
             <div class="eq-value" id="total-spent">Loading...</div>
           </div>
           <div class="eq-op" aria-hidden="true">=</div>
           <div class="eq-item eq-balance">
-            <div class="eq-ghost eq-ghost-pending" id="pending-balance" aria-label="Projected balance with pending"></div>
+            <div class="eq-ghost-group">
+              <div class="eq-ghost eq-ghost-pending" id="pending-balance" aria-label="Projected balance with pending"></div>
+            </div>
             <div class="eq-label">Balance</div>
             <div class="eq-value" id="balance">Loading...</div>
           </div>

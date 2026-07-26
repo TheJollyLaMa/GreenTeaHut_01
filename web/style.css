@@ -376,17 +376,26 @@ a {
   color: #64748b;
 }
 
+.eq-ghost-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 1.15rem;
+  gap: 0.1rem;
+  width: 100%;
+}
+
 .eq-ghost {
   font-size: 0.8rem;
   font-style: italic;
-  min-height: 1.15rem;
   line-height: 1.15;
   opacity: 0.45;
   letter-spacing: 0.01em;
 }
 
 .eq-ghost:empty {
-  visibility: hidden;
+  display: none;
 }
 
 .eq-ghost-pending {
