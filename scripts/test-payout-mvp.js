@@ -33,7 +33,8 @@ assert(htmlSource.includes('id="payout-clock-in-form"'), 'Payout view now includ
 assert(htmlSource.includes('id="payout-review-form"'), 'Payout view now includes reviewer settlement controls');
 
 console.log('\n=== 2. QR freshness and signature guards are present ===');
-assert(appSource.includes('const QR_FRESHNESS_WINDOW_MS = 10 * 60 * 1000'), 'QR freshness window is defined');
+assert(appSource.includes('const QR_EXPIRATION_WINDOW_MS = 10 * 60 * 1000'), 'QR expiration window is defined');
+assert(appSource.includes('const ACCRUAL_BUCKETS_PER_HOUR = 4'), 'Accrual bucket divisor is defined');
 assert(appSource.includes('function buildQrMessage(payload)'), 'Signed QR payload message builder exists');
 assert(appSource.includes('window.ethers.verifyMessage'), 'QR signature verification uses ethers.verifyMessage');
 assert(appSource.includes('payoutState.usedNonces'), 'QR nonce replay protection is stored in payout state');

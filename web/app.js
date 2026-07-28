@@ -49,7 +49,12 @@ function setActiveView(view) {
 
   // Populate wallet panel when it becomes visible
   if (view === 'wallet') updateWalletPanel();
-  if (view === 'payout') renderPayoutView();
+  if (view === 'payout') {
+    startPayoutClock();
+    renderPayoutView();
+  } else {
+    stopPayoutClock();
+  }
 }
 
 // Toolbar button click handlers
@@ -234,8 +239,11 @@ const ABI_STATUS_COMPATIBLE = 'Compatible ✓';
 const STATUS_COLOR_SUCCESS = '#166534';
 const STATUS_COLOR_ERROR = '#b91c1c';
 const STATUS_COLOR_WARNING = '#92400e';
-const QR_FRESHNESS_WINDOW_MS = 10 * 60 * 1000;
+const QR_EXPIRATION_WINDOW_MS = 10 * 60 * 1000;
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+const ACCRUAL_BUCKETS_PER_HOUR = 4;
+const MIN_HOURLY_RATE_USD = ACCRUAL_BUCKETS_PER_HOUR;
+const MAX_DISPLAYED_PAYOUT_EVENTS = 20;
 const PAYOUT_STORAGE_KEY = 'gth-payout-mvp-v1';
 const payoutPendingActions = new Set();
 let payoutServerTimestampCache = '';
@@ -377,7 +385,7 @@ function getShiftAccruedBuckets(shift, now = Date.now()) {
 }
 
 function getShiftAccruedAmount(shift, now = Date.now()) {
-  const bucketAmount = Number(shift.ratePerHour || 0) / 4;
+  const bucketAmount = Number(shift.ratePerHour || 0) / ACCRUAL_BUCKETS_PER_HOUR;
   return Math.round(getShiftAccruedBuckets(shift, now) * bucketAmount);
 }
 
@@ -451,6 +459,19 @@ function setPayoutActionPending(actionKey, isPending) {
     payoutPendingActions.delete(actionKey);
   }
   renderPayoutView();
+}
+
+function startPayoutClock() {
+  if (payoutClock) return;
+  payoutClock = window.setInterval(() => {
+    renderPayoutView();
+  }, 15000);
+}
+
+function stopPayoutClock() {
+  if (!payoutClock) return;
+  window.clearInterval(payoutClock);
+  payoutClock = null;
 }
 
 function txLink(txHash) {
@@ -1544,7 +1565,7 @@ function renderPayoutEventTable() {
     return;
   }
 
-  events.slice(0, 20).forEach((event) => {
+  events.slice(0, MAX_DISPLAYED_PAYOUT_EVENTS).forEach((event) => {
     const row = document.createElement('tr');
     [
       formatLocalDateTime(event.clientTimestamp),
@@ -1586,7 +1607,11 @@ async function handleGenerateQrPayload(event) {
     setPayoutStatus(payoutQrStatusEl, 'Site ID and task context are required to generate a QR payload.', 'error');
     return;
   }
-  if (!Number.isInteger(ratePerHour) || ratePerHour < 4 || ratePerHour % 4 !== 0) {
+  if (
+    !Number.isInteger(ratePerHour) ||
+    ratePerHour < MIN_HOURLY_RATE_USD ||
+    ratePerHour % ACCRUAL_BUCKETS_PER_HOUR !== 0
+  ) {
     setPayoutStatus(
       payoutQrStatusEl,
       'Hourly rate must be a whole USD value divisible by 4 so each 15-minute accrual bucket stays ledger-safe.',
@@ -1663,13 +1688,17 @@ function parseSignedQrPayload(payloadText) {
   if (!Number.isFinite(issuedAtMs)) {
     throw new Error('QR payload timestamp is invalid.');
   }
-  if (!Number.isInteger(ratePerHour) || ratePerHour < 4 || ratePerHour % 4 !== 0) {
+  if (
+    !Number.isInteger(ratePerHour) ||
+    ratePerHour < MIN_HOURLY_RATE_USD ||
+    ratePerHour % ACCRUAL_BUCKETS_PER_HOUR !== 0
+  ) {
     throw new Error('QR payload hourly rate must be a whole USD value divisible by 4.');
   }
   if (!isWalletAddress(reviewerWallet)) {
     throw new Error('QR payload reviewer wallet is invalid.');
   }
-  if (Math.abs(Date.now() - issuedAtMs) > QR_FRESHNESS_WINDOW_MS) {
+  if (Math.abs(Date.now() - issuedAtMs) > QR_EXPIRATION_WINDOW_MS) {
     throw new Error('QR payload expired or is not yet valid. Generate a fresh signed QR code and try again.');
   }
   if (payoutState.usedNonces[`${siteId}:${nonce}`]) {
@@ -1885,7 +1914,7 @@ async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reason
     }
 
     if (shift.ledgerEntryId) {
-      if (shift.ledgerAmount !== approvedAmount && shift.ledgerStatus !== STATUS_CONFIRMED) {
+      if (shift.ledgerAmount !== approvedAmount && shift.ledgerStatus === STATUS_REQUESTED) {
         const result = await runTransaction('Labor ledger amount update', () =>
           signerContract.updatePendingAmount(
             shift.ledgerEntryId,
@@ -2192,11 +2221,6 @@ async function init() {
   syncPayoutWalletDefaults();
   renderPayoutView();
   hydratePayoutReviewForm();
-  if (!payoutClock) {
-    payoutClock = window.setInterval(() => {
-      if (activeView === 'payout') renderPayoutView();
-    }, 15000);
-  }
   await refreshWalletState();
   await refreshLedger();
 }
