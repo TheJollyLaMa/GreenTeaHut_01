@@ -158,8 +158,8 @@ const STATUS_CANCELED = 'CANCELED';
 const TX_TYPE_INCOMING = 0;
 const TX_TYPE_OUTGOING = 1;
 // EntryStatus enum values (on-chain uint8). Order must match EntryStatus in ProjectLedger.sol.
-// PENDING (0) — soft incoming entry; CONFIRMED (1) — finalized/settled.
-// REQUESTED (2) — soft outgoing entry; COMMITTED (3) — approved; CANCELED (4) — voided.
+// PENDING (0) — soft incoming entry; CONFIRMED (1) — transfer completed with proof.
+// REQUESTED (2) — soft outgoing entry; COMMITTED (3) — approved, awaiting transfer; CANCELED (4) — voided.
 const ENTRY_STATUS_PENDING = 0;
 const ENTRY_STATUS_CONFIRMED = 1;
 const ENTRY_STATUS_REQUESTED = 2;
@@ -742,7 +742,7 @@ function createTimestampCell(entry) {
   if (entry.settledAt) {
     const settled = document.createElement('small');
     settled.className = 'muted-text';
-    settled.textContent = `Settled: ${formatDateTime(entry.settledAt)}`;
+    settled.textContent = `Confirmed: ${formatDateTime(entry.settledAt)}`;
     dateCell.appendChild(settled);
   }
 
@@ -776,10 +776,10 @@ async function runTransaction(label, action) {
 
 async function handleConfirmEntry(entryId) {
   if (!isAdminWallet) return;
-  const proofUrl = window.prompt('Enter settlement proof URL (required):');
+  const proofUrl = window.prompt('Enter transfer proof URL (required):');
   if (proofUrl === null) return;
   if (!proofUrl.trim() || !isValidUrl(proofUrl.trim())) {
-    setTxStatus('A valid proof URL is required to confirm/settle an entry.', 'error');
+    setTxStatus('A valid proof URL is required to confirm a completed transfer.', 'error');
     return;
   }
   const signerContract = await getSignerContract();
@@ -846,7 +846,7 @@ function createActionsCell(entry) {
   const confirmButton = document.createElement('button');
   confirmButton.type = 'button';
   confirmButton.className = 'table-action';
-  confirmButton.textContent = 'Confirm/Settle';
+  confirmButton.textContent = 'Confirm Transfer';
   setActionButtonEnabled(confirmButton, isAdminWallet && isSoftEntry);
   confirmButton.addEventListener('click', () => handleConfirmEntry(entry.id));
 
@@ -1475,7 +1475,7 @@ function renderPayoutShiftTable() {
       }
       actionsWrap.appendChild(
         createPayoutActionButton(
-          shift.settledAt ? 'Settled' : 'Review',
+          shift.settledAt ? 'Confirmed' : 'Review',
           `review:${shift.id}`,
           false,
           () => {
@@ -1537,7 +1537,7 @@ function renderPayoutLedgerTable() {
       row.appendChild(approverCell);
 
       const settledCell = document.createElement('td');
-      settledCell.textContent = shift.settledAt ? formatLocalDateTime(shift.settledAt) : 'Pending';
+      settledCell.textContent = shift.settledAt ? formatLocalDateTime(shift.settledAt) : 'Awaiting proof';
       row.appendChild(settledCell);
 
       const proofCell = document.createElement('td');
@@ -1548,7 +1548,7 @@ function renderPayoutLedgerTable() {
         proofLink.href = shift.proofUrl;
         proofLink.target = '_blank';
         proofLink.rel = 'noopener noreferrer';
-        proofLink.textContent = 'Settlement proof';
+        proofLink.textContent = 'Transfer proof';
         proofLinks.appendChild(proofLink);
       }
       if (shift.ledgerConfirmedTxHash) {
@@ -1935,7 +1935,7 @@ async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reason
           signerContract.updatePendingAmount(
             shift.ledgerEntryId,
             BigInt(toWholeUsd(approvedAmount)),
-            reasonNote || 'Reviewer adjusted payout before settlement.',
+            reasonNote || 'Reviewer adjusted payout before transfer confirmation.',
             '',
           ),
         );
@@ -2047,11 +2047,11 @@ async function handlePayoutReviewSubmit(event) {
     return;
   }
   if (!proofUrl || !isValidUrl(proofUrl)) {
-    setPayoutStatus(payoutReviewStatusEl, 'A valid settlement proof URL is required.', 'error');
+    setPayoutStatus(payoutReviewStatusEl, 'A valid transfer proof URL is required to confirm the transfer.', 'error');
     return;
   }
   if (syncLedgerSelection && approvedAmount < 1) {
-    setPayoutStatus(payoutReviewStatusEl, 'Public-ledger settlement requires an approved amount of at least 1 USD.', 'error');
+    setPayoutStatus(payoutReviewStatusEl, 'Public-ledger confirmation requires an approved amount of at least 1 USD.', 'error');
     return;
   }
   if (approvedAmount < accruedAmount && !adjustmentReason) {
@@ -2063,11 +2063,11 @@ async function handlePayoutReviewSubmit(event) {
     return;
   }
   if (shift.settledAt || isProcessedAction(shift.settlementIdempotencyKey)) {
-    setPayoutStatus(payoutReviewStatusEl, 'This shift has already been settled. Duplicate settlement is blocked.', 'error');
+    setPayoutStatus(payoutReviewStatusEl, 'This shift has already been confirmed. Duplicate transfer confirmation is blocked.', 'error');
     return;
   }
   if (payoutPendingActions.has(shift.settlementIdempotencyKey)) {
-    setPayoutStatus(payoutReviewStatusEl, 'Settlement already in progress for this shift.', 'error');
+    setPayoutStatus(payoutReviewStatusEl, 'Transfer confirmation already in progress for this shift.', 'error');
     return;
   }
 
@@ -2086,7 +2086,7 @@ async function handlePayoutReviewSubmit(event) {
 
       const signerContract = await getSignerContract();
       if (!signerContract) {
-        setPayoutStatus(payoutReviewStatusEl, 'Unable to access the signer contract for settlement.', 'error');
+        setPayoutStatus(payoutReviewStatusEl, 'Unable to access the signer contract for transfer confirmation.', 'error');
         return;
       }
 
@@ -2110,11 +2110,11 @@ async function handlePayoutReviewSubmit(event) {
         );
       }
 
-      const confirmResult = await runTransaction('Labor settlement confirmation', () =>
+      const confirmResult = await runTransaction('Labor transfer confirmation', () =>
         signerContract.confirmEntry(shift.ledgerEntryId, proofUrl),
       );
       if (!confirmResult) {
-        setPayoutStatus(payoutReviewStatusEl, 'Unable to confirm the labor settlement entry.', 'error');
+        setPayoutStatus(payoutReviewStatusEl, 'Unable to confirm the labor transfer entry.', 'error');
         return;
       }
       shift.ledgerStatus = STATUS_CONFIRMED;
@@ -2134,8 +2134,8 @@ async function handlePayoutReviewSubmit(event) {
       new Date().toISOString(),
       await getPayoutServerTimestamp(),
       syncLedgerSelection && shift.ledgerEntryId
-        ? `Settled via ProjectLedger entry #${shift.ledgerEntryId}.`
-        : 'Settled off-chain without public ledger sync.',
+        ? `Confirmed via ProjectLedger entry #${shift.ledgerEntryId}.`
+        : 'Transfer completed externally without public ledger sync.',
     );
     recordProcessedAction(shift.settlementIdempotencyKey, {
       shiftId: shift.id,
@@ -2145,7 +2145,7 @@ async function handlePayoutReviewSubmit(event) {
     renderPayoutView();
     setPayoutStatus(
       payoutReviewStatusEl,
-      `Shift ${shift.id} settled${shift.ledgerEntryId ? ` with ProjectLedger entry #${shift.ledgerEntryId}` : ''}.`,
+      `Shift ${shift.id} confirmed${shift.ledgerEntryId ? ` with ProjectLedger entry #${shift.ledgerEntryId}` : ''}.`,
       'success',
     );
   } finally {

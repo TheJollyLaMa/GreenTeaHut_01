@@ -194,7 +194,7 @@
 
         <section class="entry-section" aria-label="Add Entry to the Books">
           <h2 class="ledger-heading">Add Entry to the Books</h2>
-          <p class="entry-helper">New entries are added on-chain as PENDING (expected incoming) or REQUESTED (expected outgoing). Confirm/Settle from the table when proof is ready. Use "Revise Amount" to update an estimate before settlement.</p>
+          <p class="entry-helper">New entries are added on-chain as PENDING (expected incoming) or REQUESTED (expected outgoing). Move outgoing entries to COMMITTED when approved and use "Confirm Transfer" only after the transfer is complete and proof is ready. Use "Revise Amount" to update an estimate before confirmation.</p>
           <form id="entry-form" class="entry-form" novalidate>
             <label for="entry-type">
               Type
@@ -297,7 +297,7 @@
     <div id="payout-view" class="payout-view" hidden aria-label="Labor &amp; Services Payout">
       <section class="payout-section" aria-label="Payout overview">
         <h2 class="payout-heading">🎖️ Labor &amp; Services Payout</h2>
-        <p class="payout-intro">Clock workers in with signed QR payloads, accrue labor in 15-minute buckets, and settle each shift exactly once with ledger proof.</p>
+        <p class="payout-intro">Clock workers in with signed QR payloads, accrue labor in 15-minute buckets, and record each completed transfer exactly once with proof.</p>
         <div class="payout-summary-grid" aria-label="Payout summary">
           <article class="payout-summary-card">
             <span class="payout-kpi-label">Active shifts</span>
@@ -312,12 +312,14 @@
             <strong id="payout-requested-total" class="payout-kpi">$0.00</strong>
           </article>
           <article class="payout-summary-card">
-            <span class="payout-kpi-label">Settled labor total</span>
+            <span class="payout-kpi-label">Confirmed labor total</span>
             <strong id="payout-settled-total" class="payout-kpi">$0.00</strong>
           </article>
         </div>
         <div class="payout-note">
-          <p><strong>MVP guardrails:</strong> one active shift per worker per site, signed QR nonce replay protection, 10-minute QR freshness, and one-time settlement idempotency per shift.</p>
+          <p><strong>MVP guardrails:</strong> one active shift per worker per site, signed QR nonce replay protection, 10-minute QR freshness, and one-time transfer confirmation per shift.</p>
+          <p><strong>MVP payment handling:</strong> Payments are recorded here; transfer is executed externally in MVP.</p>
+          <p><strong>Status guide:</strong> <code>COMMITTED</code> = approved, awaiting transfer. <code>CONFIRMED</code> = transfer completed + proof attached.</p>
           <p><strong>Deployment recommendation:</strong> use <strong>Option 1</strong> for this MVP — keep `ProjectLedger` as the public record of requested/committed/confirmed labor payouts and execute payout settlement off-chain. <strong>Option 2</strong> remains a future path if on-chain escrow or ABI-level shift state becomes necessary.</p>
         </div>
       </section>
@@ -400,9 +402,9 @@
         </div>
       </section>
 
-      <section class="payout-section" aria-label="Reviewer settlement">
-        <h3 class="payout-subheading">✅ Reviewer settlement</h3>
-        <p class="payout-copy">Reviewers can approve the full accrued amount or settle an adjusted amount. Any manual adjustment should include a reason, and public ledger sync requires the admin wallet.</p>
+      <section class="payout-section" aria-label="Reviewer approval and transfer confirmation">
+        <h3 class="payout-subheading">✅ Reviewer approval &amp; transfer confirmation</h3>
+        <p class="payout-copy">Reviewers can approve the full accrued amount or confirm an adjusted transfer after it is completed externally. Any manual adjustment should include a reason, and public ledger sync requires the admin wallet.</p>
         <form id="payout-review-form" class="payout-form-grid">
           <label class="payout-field">
             <span>Shift</span>
@@ -423,25 +425,25 @@
             <textarea id="payout-adjustment-reason" name="adjustmentReason" rows="3" placeholder="Required for downward adjustments."></textarea>
           </label>
           <label class="payout-field payout-field-full">
-            <span>Settlement proof URL</span>
+            <span>Transfer proof URL</span>
             <input id="payout-proof-url" name="proofUrl" type="url" placeholder="https://..." />
           </label>
           <label class="payout-checkbox">
             <input id="payout-sync-ledger" name="syncLedger" type="checkbox" checked />
-            <span>Sync settlement to the public `ProjectLedger` lifecycle</span>
+            <span>Sync this payout record to the public `ProjectLedger` lifecycle</span>
           </label>
           <div class="payout-inline-actions">
             <button id="payout-use-accrued" type="button" class="table-action">Use accrued amount</button>
             <button id="payout-sync-ledger-btn" type="button" class="table-action">Sync requested ledger</button>
-            <button id="payout-settle-btn" type="submit" class="entry-submit">Approve &amp; settle shift</button>
+            <button id="payout-settle-btn" type="submit" class="entry-submit">Approve &amp; confirm transfer</button>
           </div>
         </form>
         <p id="payout-review-status" class="payout-status" aria-live="polite"></p>
       </section>
 
-      <section class="payout-section" aria-label="Payment ledger">
-        <h3 class="payout-subheading">📒 Payment ledger</h3>
-        <p class="payout-copy">Each shift tracks its local review state plus any linked public-ledger entry, confirmation status, approver, settlement timestamp, and proof link.</p>
+      <section class="payout-section" aria-label="Payout record ledger">
+        <h3 class="payout-subheading">📒 Payout record ledger</h3>
+        <p class="payout-copy">Each shift tracks its local review state plus any linked public-ledger entry, confirmation status, approver, transfer confirmation timestamp, and proof link.</p>
         <div class="table-wrap">
           <table class="payout-table">
             <thead>
@@ -451,7 +453,7 @@
                 <th>Amount</th>
                 <th>Lifecycle</th>
                 <th>Approved by</th>
-                <th>Settled</th>
+                <th>Confirmed</th>
                 <th>Proof</th>
               </tr>
             </thead>
@@ -466,7 +468,7 @@
 
       <section class="payout-section" aria-label="Shift event log">
         <h3 class="payout-subheading">🗂️ Shift event log</h3>
-        <p class="payout-copy">Clock-in, clock-out, ledger sync, and settlement events capture worker/reviewer identity plus client and server timestamps when available.</p>
+        <p class="payout-copy">Clock-in, clock-out, ledger sync, and transfer confirmation events capture worker/reviewer identity plus client and server timestamps when available.</p>
         <div class="table-wrap">
           <table class="payout-table">
             <thead>
