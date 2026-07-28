@@ -253,6 +253,11 @@ function formatAmount(value) {
   return currency.format(Number(value) || 0);
 }
 
+function toWholeUsd(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? Math.round(amount) : 0;
+}
+
 function getErrorMessage(error, fallback = 'An unexpected error occurred. Please try again.') {
   // Prefer the decoded revert reason (e.g. "Native must use 18 decimals") when available.
   // ethers.js v6 surfaces this as `reason`; also try `shortMessage` for ABI-decoded errors,
@@ -399,7 +404,7 @@ function formatShiftAccrual(shift) {
 }
 
 function getShiftDisplayAmount(shift) {
-  if (typeof shift.approvedAmount === 'number') return Math.round(shift.approvedAmount);
+  if (typeof shift.approvedAmount === 'number') return toWholeUsd(shift.approvedAmount);
   return getShiftAccruedAmount(shift);
 }
 
@@ -1708,14 +1713,15 @@ function parseSignedQrPayload(payloadText) {
     throw new Error('This QR payload nonce has already been used. Duplicate clock-ins are blocked.');
   }
 
-  const recoveredWallet = normalizeWallet(window.ethers.verifyMessage(buildQrMessage({
+  const signedPayload = {
     siteId,
     taskId,
     nonce,
     issuedAt,
     reviewerWallet,
     ratePerHour,
-  }), signature));
+  };
+  const recoveredWallet = normalizeWallet(window.ethers.verifyMessage(buildQrMessage(signedPayload), signature));
 
   if (recoveredWallet.toLowerCase() !== reviewerWallet.toLowerCase()) {
     throw new Error('QR payload signature verification failed.');
@@ -1917,11 +1923,11 @@ async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reason
     }
 
     if (shift.ledgerEntryId) {
-      if (Math.round(Number(shift.ledgerAmount)) !== approvedAmount && shift.ledgerStatus === STATUS_REQUESTED) {
+      if (toWholeUsd(shift.ledgerAmount) !== approvedAmount && shift.ledgerStatus === STATUS_REQUESTED) {
         const result = await runTransaction('Labor ledger amount update', () =>
           signerContract.updatePendingAmount(
             shift.ledgerEntryId,
-            BigInt(Math.round(approvedAmount)),
+            BigInt(toWholeUsd(approvedAmount)),
             reasonNote || 'Reviewer adjusted payout before settlement.',
             '',
           ),
@@ -1949,7 +1955,7 @@ async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reason
       signerContract.createEntry(
         TX_TYPE_OUTGOING,
         ENTRY_STATUS_REQUESTED,
-        BigInt(Math.round(approvedAmount)),
+        BigInt(toWholeUsd(approvedAmount)),
         payload.category,
         payload.description,
         '',
@@ -1983,7 +1989,7 @@ async function handleSyncRequestedLedger() {
     return;
   }
 
-  const approvedAmount = Number(payoutApprovedAmountEl ? payoutApprovedAmountEl.value : 0);
+  const approvedAmount = toWholeUsd(payoutApprovedAmountEl ? payoutApprovedAmountEl.value : 0);
   const reviewerWallet = normalizeWallet((payoutReviewerWalletEl && payoutReviewerWalletEl.value) || currentAccount);
   if (!isWalletAddress(reviewerWallet)) {
     setPayoutStatus(payoutReviewStatusEl, 'Enter a valid reviewer wallet before syncing the ledger.', 'error');
@@ -2019,11 +2025,11 @@ async function handlePayoutReviewSubmit(event) {
   }
 
   const reviewerWallet = normalizeWallet((payoutReviewerWalletEl && payoutReviewerWalletEl.value) || currentAccount);
-  const approvedAmount = Number(payoutApprovedAmountEl ? payoutApprovedAmountEl.value : 0);
+  const approvedAmount = toWholeUsd(payoutApprovedAmountEl ? payoutApprovedAmountEl.value : 0);
   const proofUrl = payoutProofUrlEl ? payoutProofUrlEl.value.trim() : '';
   const adjustmentReason = payoutAdjustmentReasonEl ? payoutAdjustmentReasonEl.value.trim() : '';
   const syncLedgerSelection = Boolean(payoutSyncLedgerEl && payoutSyncLedgerEl.checked);
-  const accruedAmount = getShiftAccruedAmount(shift);
+  const accruedAmount = toWholeUsd(getShiftAccruedAmount(shift));
 
   if (!isWalletAddress(reviewerWallet)) {
     setPayoutStatus(payoutReviewStatusEl, 'Reviewer wallet is required and must be valid.', 'error');
