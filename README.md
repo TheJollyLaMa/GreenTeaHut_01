@@ -37,6 +37,16 @@ Project funding and spending are tracked alongside milestone progress and displa
 - Any soft entry can be `CONFIRMED` (settled) once a proof/reference URL is available.
 - Balances distinguish **projected** (includes soft entries) from **confirmed/settled** totals.
 
+### Labor & Services Payout MVP
+- The existing `🎖️` toolbar view now supports signed QR clock-in payloads, 15-minute accrual tracking, reviewer approval, single-settlement guards, and payout proof links.
+- Shift records are stored locally in the browser for this MVP and can be synced into `ProjectLedger` as outgoing labor entries using the existing `REQUESTED → COMMITTED → CONFIRMED` lifecycle.
+- Reviewer-led downward adjustments require a reason note before settlement.
+
+### Payout deployment recommendation
+- **Option 1 — recommended for this MVP:** keep the existing `ProjectLedger` contract and use it as the public record for requested, approved, and confirmed labor payouts while actual payout execution happens off-chain.
+- **Option 2 — future upgrade path:** deploy a dedicated `PayoutEscrow` contract only if per-shift on-chain accrual, replay-proof attestations, or immutable settlement guards must move on-chain.
+- **Current PR impact:** no contract or ABI changes are required for the MVP shipped in this repository, so there is no manual deploy step for this change.
+
 ### Updating the frontend ABI
 The frontend ABI in `web/app.js` (`PROJECT_LEDGER_ABI`) must stay in sync with the deployed contract.
 
