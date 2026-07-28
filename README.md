@@ -21,9 +21,9 @@ Project funding and spending are tracked alongside milestone progress and displa
 2. Use MetaMask on **Optimism** (chain ID `10`) to avoid wrong-network errors.
 3. Admin writes are enabled for the deployed contract **owner** wallet only.
 4. Use **Add Entry to the Books** to create a `PENDING` or `REQUESTED` on-chain entry.
-5. Use **Confirm/Settle** in the ledger table with a proof URL to settle entries.
+5. Use **Confirm Transfer** in the ledger table only after the transfer is complete and a proof URL is available.
 6. Use **→ Committed** / **→ Cancel** buttons to transition requested entries.
-7. Use **Revise Amount** to update an estimate before settlement (requires a reason).
+7. Use **Revise Amount** to update an estimate before confirmation (requires a reason).
 
 ### Goals
 1. Transparent accounting
@@ -33,9 +33,20 @@ Project funding and spending are tracked alongside milestone progress and displa
 
 ### Settlement flow
 - New incoming entries begin as `PENDING`; new outgoing entries begin as `REQUESTED`.
-- Outgoing entries can be moved to `COMMITTED` (approved) or `CANCELED` (voided).
-- Any soft entry can be `CONFIRMED` (settled) once a proof/reference URL is available.
-- Balances distinguish **projected** (includes soft entries) from **confirmed/settled** totals.
+- Outgoing entries can be moved to `COMMITTED` (approved, awaiting transfer) or `CANCELED` (voided).
+- Any soft entry can be `CONFIRMED` (transfer completed + proof attached) once a proof/reference URL is available.
+- Balances distinguish **projected** (includes soft entries) from **confirmed** totals.
+
+### Labor & Services Payout MVP
+- The existing `🎖️` toolbar view now supports signed QR clock-in payloads, 15-minute accrual tracking, reviewer approval, single-confirmation guards, and payout proof links.
+- Shift records are stored locally in the browser for this MVP and can be synced into `ProjectLedger` as outgoing labor entries using the existing `REQUESTED → COMMITTED → CONFIRMED` lifecycle.
+- Reviewer-led adjustments should include a reason note before transfer confirmation, with downward adjustments enforced as mandatory.
+- In the MVP UI, payments are recorded in the flow while the actual transfer is executed externally.
+
+### Payout deployment recommendation
+- **Option 1 — recommended for this MVP:** keep the existing `ProjectLedger` contract and use it as the public record for requested, approved, and confirmed labor payouts while actual payout execution happens off-chain.
+- **Option 2 — future upgrade path:** deploy a dedicated `PayoutEscrow` contract only if per-shift on-chain accrual, replay-proof attestations, or immutable settlement guards must move on-chain.
+- **Current PR impact:** no contract or ABI changes are required for the MVP shipped in this repository, so there is no manual deploy step for this change.
 
 ### Updating the frontend ABI
 The frontend ABI in `web/app.js` (`PROJECT_LEDGER_ABI`) must stay in sync with the deployed contract.

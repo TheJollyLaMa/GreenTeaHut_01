@@ -49,6 +49,12 @@ function setActiveView(view) {
 
   // Populate wallet panel when it becomes visible
   if (view === 'wallet') updateWalletPanel();
+  if (view === 'payout') {
+    startPayoutClock();
+    renderPayoutView();
+  } else {
+    stopPayoutClock();
+  }
 }
 
 // Toolbar button click handlers
@@ -152,8 +158,8 @@ const STATUS_CANCELED = 'CANCELED';
 const TX_TYPE_INCOMING = 0;
 const TX_TYPE_OUTGOING = 1;
 // EntryStatus enum values (on-chain uint8). Order must match EntryStatus in ProjectLedger.sol.
-// PENDING (0) — soft incoming entry; CONFIRMED (1) — finalized/settled.
-// REQUESTED (2) — soft outgoing entry; COMMITTED (3) — approved; CANCELED (4) — voided.
+// PENDING (0) — soft incoming entry; CONFIRMED (1) — transfer completed with proof.
+// REQUESTED (2) — soft outgoing entry; COMMITTED (3) — approved, awaiting transfer; CANCELED (4) — voided.
 const ENTRY_STATUS_PENDING = 0;
 const ENTRY_STATUS_CONFIRMED = 1;
 const ENTRY_STATUS_REQUESTED = 2;
@@ -182,6 +188,35 @@ const entryFormControls = entryFormEl ? Array.from(entryFormEl.elements) : [];
 const walletConnectBtnEl = document.getElementById('wallet-connect-btn');
 const walletStatusEl = document.getElementById('wallet-status');
 const txStatusEl = document.getElementById('tx-status');
+const payoutActiveCountEl = document.getElementById('payout-active-count');
+const payoutCompletedCountEl = document.getElementById('payout-completed-count');
+const payoutRequestedTotalEl = document.getElementById('payout-requested-total');
+const payoutSettledTotalEl = document.getElementById('payout-settled-total');
+const payoutQrGeneratorFormEl = document.getElementById('payout-qr-generator-form');
+const payoutSiteIdEl = document.getElementById('payout-site-id');
+const payoutTaskIdEl = document.getElementById('payout-task-id');
+const payoutHourlyRateEl = document.getElementById('payout-hourly-rate');
+const payoutQrReviewerWalletEl = document.getElementById('payout-qr-reviewer-wallet');
+const payoutGeneratedQrEl = document.getElementById('payout-generated-qr');
+const payoutQrStatusEl = document.getElementById('payout-qr-status');
+const payoutClockInFormEl = document.getElementById('payout-clock-in-form');
+const payoutWorkerNameEl = document.getElementById('payout-worker-name');
+const payoutWorkerWalletEl = document.getElementById('payout-worker-wallet');
+const payoutQrPayloadEl = document.getElementById('payout-qr-payload');
+const payoutWorkerStatusEl = document.getElementById('payout-worker-status');
+const payoutShiftsBodyEl = document.getElementById('payout-shifts-body');
+const payoutReviewFormEl = document.getElementById('payout-review-form');
+const payoutReviewShiftEl = document.getElementById('payout-review-shift');
+const payoutReviewerWalletEl = document.getElementById('payout-reviewer-wallet');
+const payoutApprovedAmountEl = document.getElementById('payout-approved-amount');
+const payoutAdjustmentReasonEl = document.getElementById('payout-adjustment-reason');
+const payoutProofUrlEl = document.getElementById('payout-proof-url');
+const payoutSyncLedgerEl = document.getElementById('payout-sync-ledger');
+const payoutUseAccruedBtnEl = document.getElementById('payout-use-accrued');
+const payoutSyncLedgerBtnEl = document.getElementById('payout-sync-ledger-btn');
+const payoutReviewStatusEl = document.getElementById('payout-review-status');
+const payoutBodyEl = document.getElementById('payout-body');
+const payoutEventsBodyEl = document.getElementById('payout-events-body');
 
 const fieldErrorNames = ['type', 'amount', 'category', 'description', 'reference'];
 
@@ -204,9 +239,27 @@ const ABI_STATUS_COMPATIBLE = 'Compatible ✓';
 const STATUS_COLOR_SUCCESS = '#166534';
 const STATUS_COLOR_ERROR = '#b91c1c';
 const STATUS_COLOR_WARNING = '#92400e';
+const QR_EXPIRATION_WINDOW_MS = 10 * 60 * 1000;
+const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+const ACCRUAL_BUCKETS_PER_HOUR = 4;
+const MIN_HOURLY_RATE_USD = ACCRUAL_BUCKETS_PER_HOUR;
+const MAX_DISPLAYED_PAYOUT_EVENTS = 20;
+const PAYOUT_STORAGE_KEY = 'gth-payout-mvp-v1';
+const payoutPendingActions = new Set();
+let payoutServerTimestampCache = '';
+let payoutClock = null;
 
 function formatAmount(value) {
   return currency.format(Number(value) || 0);
+}
+
+function toWholeUsd(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? Math.round(amount) : 0;
+}
+
+function isValidHourlyRate(rate) {
+  return Number.isInteger(rate) && rate >= MIN_HOURLY_RATE_USD && rate % ACCRUAL_BUCKETS_PER_HOUR === 0;
 }
 
 function getErrorMessage(error, fallback = 'An unexpected error occurred. Please try again.') {
@@ -255,6 +308,186 @@ function toNumeric(value) {
 function shortAddress(address) {
   if (!address || address.length < 10) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function normalizeWallet(address) {
+  return String(address || '').trim();
+}
+
+function isWalletAddress(address) {
+  const value = normalizeWallet(address);
+  if (!value) return false;
+  if (typeof window.ethers !== 'undefined' && typeof window.ethers.isAddress === 'function') {
+    return window.ethers.isAddress(value);
+  }
+  return /^0x[a-fA-F0-9]{40}$/.test(value);
+}
+
+function formatLocalDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString();
+}
+
+function createActionId(prefix) {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return `${prefix}-${window.crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function buildNonceKey(siteId, nonce) {
+  return `${siteId}:${nonce}`;
+}
+
+function buildQrMessage(payload) {
+  return [
+    'GreenTeaHut Labor QR',
+    payload.siteId,
+    payload.taskId,
+    payload.nonce,
+    payload.issuedAt,
+    String(payload.ratePerHour),
+    payload.reviewerWallet,
+  ].join('|');
+}
+
+function loadPayoutState() {
+  try {
+    const raw = window.localStorage.getItem(PAYOUT_STORAGE_KEY);
+    if (!raw) {
+      return { shifts: [], usedNonces: {}, processedActions: {} };
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      shifts: Array.isArray(parsed.shifts) ? parsed.shifts : [],
+      usedNonces: parsed.usedNonces && typeof parsed.usedNonces === 'object' ? parsed.usedNonces : {},
+      processedActions:
+        parsed.processedActions && typeof parsed.processedActions === 'object' ? parsed.processedActions : {},
+    };
+  } catch (error) {
+    console.warn('Unable to load payout state; resetting local payout store.', error);
+    return { shifts: [], usedNonces: {}, processedActions: {} };
+  }
+}
+
+function savePayoutState() {
+  window.localStorage.setItem(PAYOUT_STORAGE_KEY, JSON.stringify(payoutState));
+}
+
+const payoutState = loadPayoutState();
+
+function setPayoutStatus(element, message, type = '') {
+  if (!element) return;
+  element.textContent = message;
+  element.className = `payout-status${type ? ` ${type}` : ''}`;
+}
+
+function getShiftStatus(shift) {
+  if (shift.settledAt) return STATUS_CONFIRMED;
+  if (shift.clockedOutAt) return shift.ledgerEntryId ? STATUS_REQUESTED : 'CLOCKED_OUT';
+  return 'ACTIVE';
+}
+
+function getShiftAccruedBuckets(shift, now = Date.now()) {
+  const end = shift.clockedOutAt || now;
+  const start = shift.clockedInAt || now;
+  const elapsed = Math.max(0, end - start);
+  return Math.floor(elapsed / FIFTEEN_MINUTES_MS);
+}
+
+function getShiftAccruedAmount(shift, now = Date.now()) {
+  const hourlyRate = Number(shift.ratePerHour || 0);
+  if (!isValidHourlyRate(hourlyRate)) {
+    return 0;
+  }
+  return getShiftAccruedBuckets(shift, now) * (hourlyRate / ACCRUAL_BUCKETS_PER_HOUR);
+}
+
+function formatShiftAccrual(shift) {
+  const buckets = getShiftAccruedBuckets(shift);
+  const amount = getShiftAccruedAmount(shift);
+  return `${formatAmount(amount)} · ${buckets} × 15m`;
+}
+
+function getShiftDisplayAmount(shift) {
+  if (typeof shift.approvedAmount === 'number') return toWholeUsd(shift.approvedAmount);
+  return getShiftAccruedAmount(shift);
+}
+
+function findShiftById(shiftId) {
+  return payoutState.shifts.find((shift) => shift.id === shiftId) || null;
+}
+
+function getActiveShiftForWorkerSite(workerWallet, siteId) {
+  return payoutState.shifts.find(
+    (shift) =>
+      normalizeWallet(shift.workerWallet).toLowerCase() === normalizeWallet(workerWallet).toLowerCase() &&
+      shift.siteId === siteId &&
+      !shift.clockedOutAt &&
+      !shift.settledAt,
+  );
+}
+
+function getPayoutEventRows() {
+  return payoutState.shifts
+    .flatMap((shift) =>
+      (shift.events || []).map((event) => ({
+        ...event,
+        shiftId: shift.id,
+      })),
+    )
+    .sort((a, b) => new Date(b.clientTimestamp).getTime() - new Date(a.clientTimestamp).getTime());
+}
+
+async function getPayoutServerTimestamp() {
+  try {
+    const response = await window.fetch(window.location.href, {
+      method: 'HEAD',
+      cache: 'no-store',
+    });
+    const value = response.headers.get('date');
+    payoutServerTimestampCache = value || payoutServerTimestampCache;
+    return value || '';
+  } catch (error) {
+    console.warn('Unable to read server timestamp for payout event logging.', error);
+    return payoutServerTimestampCache || '';
+  }
+}
+
+function recordProcessedAction(actionKey, details = {}) {
+  payoutState.processedActions[actionKey] = {
+    ...details,
+    processedAt: new Date().toISOString(),
+  };
+  savePayoutState();
+}
+
+function isProcessedAction(actionKey) {
+  return Boolean(payoutState.processedActions[actionKey]);
+}
+
+function setPayoutActionPending(actionKey, isPending) {
+  if (isPending) {
+    payoutPendingActions.add(actionKey);
+  } else {
+    payoutPendingActions.delete(actionKey);
+  }
+  renderPayoutView();
+}
+
+function startPayoutClock() {
+  if (payoutClock) return;
+  payoutClock = window.setInterval(() => {
+    renderPayoutView();
+  }, 15000);
+}
+
+function stopPayoutClock() {
+  if (!payoutClock) return;
+  window.clearInterval(payoutClock);
+  payoutClock = null;
 }
 
 function txLink(txHash) {
@@ -472,6 +705,8 @@ function getStatusBadge(status) {
     [STATUS_REQUESTED]: 'status-requested',
     [STATUS_COMMITTED]: 'status-committed',
     [STATUS_CANCELED]: 'status-canceled',
+    ACTIVE: 'status-committed',
+    CLOCKED_OUT: 'status-requested',
   };
   badge.className = `status-badge ${classMap[status] || 'status-pending'}`;
   badge.textContent = status || STATUS_PENDING;
@@ -507,7 +742,7 @@ function createTimestampCell(entry) {
   if (entry.settledAt) {
     const settled = document.createElement('small');
     settled.className = 'muted-text';
-    settled.textContent = `Settled: ${formatDateTime(entry.settledAt)}`;
+    settled.textContent = `Confirmed: ${formatDateTime(entry.settledAt)}`;
     dateCell.appendChild(settled);
   }
 
@@ -528,20 +763,23 @@ async function runTransaction(label, action) {
     setTxStatus(`${label} submitted...`, 'info');
     const tx = await action();
     setTxStatus(`${label} pending confirmation.`, 'info', tx.hash);
-    await tx.wait();
+    const receipt = await tx.wait();
     setTxStatus(`${label} confirmed.`, 'success', tx.hash);
     await refreshLedger();
+    // Multi-step payout flows reuse the tx hash immediately and may need the receipt later.
+    return { tx, receipt };
   } catch (error) {
     setTxStatus(getErrorMessage(error, 'Transaction failed. Please try again.'), 'error');
+    return null;
   }
 }
 
 async function handleConfirmEntry(entryId) {
   if (!isAdminWallet) return;
-  const proofUrl = window.prompt('Enter settlement proof URL (required):');
+  const proofUrl = window.prompt('Enter transfer proof URL (required):');
   if (proofUrl === null) return;
   if (!proofUrl.trim() || !isValidUrl(proofUrl.trim())) {
-    setTxStatus('A valid proof URL is required to confirm/settle an entry.', 'error');
+    setTxStatus('A valid proof URL is required to confirm a completed transfer.', 'error');
     return;
   }
   const signerContract = await getSignerContract();
@@ -608,7 +846,7 @@ function createActionsCell(entry) {
   const confirmButton = document.createElement('button');
   confirmButton.type = 'button';
   confirmButton.className = 'table-action';
-  confirmButton.textContent = 'Confirm/Settle';
+  confirmButton.textContent = 'Confirm Transfer';
   setActionButtonEnabled(confirmButton, isAdminWallet && isSoftEntry);
   confirmButton.addEventListener('click', () => handleConfirmEntry(entry.id));
 
@@ -876,6 +1114,7 @@ async function refreshWalletState() {
       `Wallet not detected. Install MetaMask to perform admin actions. Read-only mode is enabled on ${LEDGER_CONFIG.targetChainName}.`,
     );
     setFormEnabled(false);
+    renderPayoutView();
     return;
   }
 
@@ -889,6 +1128,8 @@ async function refreshWalletState() {
     isAdminWallet = false;
     setWalletStatus('Wallet available. Click the fox icon to connect.', false);
     setFormEnabled(false);
+    syncPayoutWalletDefaults();
+    renderPayoutView();
     return;
   }
 
@@ -899,6 +1140,8 @@ async function refreshWalletState() {
       true,
     );
     setFormEnabled(false);
+    syncPayoutWalletDefaults();
+    renderPayoutView();
     return;
   }
 
@@ -919,6 +1162,8 @@ async function refreshWalletState() {
   } else {
     setWalletStatus(`Connected: ${shortAddress(currentAccount)} (read-only; admin wallet required)`);
   }
+  syncPayoutWalletDefaults();
+  renderPayoutView();
 }
 
 async function refreshLedger() {
@@ -1047,6 +1292,874 @@ async function handleEntrySubmit(event) {
   entryFormEl.reset();
 }
 
+function appendShiftEvent(shift, type, actorWallet, clientTimestamp, serverTimestamp, notes = '') {
+  shift.events = Array.isArray(shift.events) ? shift.events : [];
+  shift.events.push({
+    type,
+    actorWallet,
+    clientTimestamp,
+    serverTimestamp,
+    notes,
+  });
+}
+
+function buildShiftLedgerMetadata(shift, approvedAmount, reviewerWallet) {
+  const bucketCount = getShiftAccruedBuckets(shift);
+  return {
+    category: `Labor · ${shift.siteId}`,
+    description: `Shift ${shift.id} · ${shift.workerName} (${shortAddress(shift.workerWallet)}) · ${shift.taskId} · reviewer ${shortAddress(reviewerWallet)} · ${bucketCount} x 15m buckets · approved ${approvedAmount} USD`,
+  };
+}
+
+function getShiftLifecycleLabel(shift) {
+  if (shift.settledAt) return STATUS_CONFIRMED;
+  if (shift.ledgerStatus) return shift.ledgerStatus;
+  if (shift.clockedOutAt) return STATUS_REQUESTED;
+  return STATUS_PENDING;
+}
+
+function syncPayoutWalletDefaults() {
+  if (currentAccount) {
+    if (payoutQrReviewerWalletEl && !payoutQrReviewerWalletEl.value) payoutQrReviewerWalletEl.value = currentAccount;
+    if (payoutReviewerWalletEl && !payoutReviewerWalletEl.value) payoutReviewerWalletEl.value = currentAccount;
+    if (payoutWorkerWalletEl && !payoutWorkerWalletEl.value) payoutWorkerWalletEl.value = currentAccount;
+  }
+}
+
+function renderPayoutSummary() {
+  const activeCount = payoutState.shifts.filter((shift) => !shift.clockedOutAt && !shift.settledAt).length;
+  const completedCount = payoutState.shifts.filter((shift) => Boolean(shift.clockedOutAt)).length;
+  const requestedTotal = payoutState.shifts
+    .filter((shift) => shift.clockedOutAt && !shift.settledAt)
+    .reduce((sum, shift) => sum + getShiftDisplayAmount(shift), 0);
+  const settledTotal = payoutState.shifts
+    .filter((shift) => Boolean(shift.settledAt))
+    .reduce((sum, shift) => sum + getShiftDisplayAmount(shift), 0);
+
+  if (payoutActiveCountEl) payoutActiveCountEl.textContent = String(activeCount);
+  if (payoutCompletedCountEl) payoutCompletedCountEl.textContent = String(completedCount);
+  if (payoutRequestedTotalEl) payoutRequestedTotalEl.textContent = formatAmount(requestedTotal);
+  if (payoutSettledTotalEl) payoutSettledTotalEl.textContent = formatAmount(settledTotal);
+}
+
+function renderPayoutWorkerStatus() {
+  if (!payoutWorkerStatusEl) return;
+  const activeShift = payoutState.shifts.find((shift) => !shift.clockedOutAt && !shift.settledAt);
+  if (!activeShift) {
+    setPayoutStatus(payoutWorkerStatusEl, 'No workers are currently clocked in.');
+    return;
+  }
+  setPayoutStatus(
+    payoutWorkerStatusEl,
+    `${activeShift.workerName} is clocked in at ${activeShift.siteId} for ${activeShift.taskId}. Live accrual: ${formatShiftAccrual(activeShift)}.`,
+    'info',
+  );
+}
+
+function renderPayoutReviewOptions() {
+  if (!payoutReviewShiftEl) return;
+  const previousValue = payoutReviewShiftEl.value;
+  payoutReviewShiftEl.innerHTML = '<option value="">Select a shift</option>';
+
+  payoutState.shifts
+    .filter((shift) => !shift.settledAt)
+    .sort((a, b) => b.clockedInAt - a.clockedInAt)
+    .forEach((shift) => {
+      const option = document.createElement('option');
+      option.value = shift.id;
+      option.textContent = `${shift.workerName} · ${shift.siteId} / ${shift.taskId} · ${getShiftStatus(shift)}`;
+      payoutReviewShiftEl.appendChild(option);
+    });
+
+  if (previousValue && payoutState.shifts.some((shift) => shift.id === previousValue && !shift.settledAt)) {
+    payoutReviewShiftEl.value = previousValue;
+  }
+}
+
+function createPayoutActionButton(label, actionKey, disabled, onClick, variant = '') {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `table-action${variant ? ` ${variant}` : ''}`;
+  button.textContent = label;
+  button.disabled = disabled || payoutPendingActions.has(actionKey);
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function renderPayoutShiftTable() {
+  if (!payoutShiftsBodyEl) return;
+  payoutShiftsBodyEl.innerHTML = '';
+
+  if (payoutState.shifts.length === 0) {
+    payoutShiftsBodyEl.innerHTML = '<tr><td colspan="8" class="payout-empty">No shifts recorded yet.</td></tr>';
+    return;
+  }
+
+  payoutState.shifts
+    .slice()
+    .sort((a, b) => b.clockedInAt - a.clockedInAt)
+    .forEach((shift) => {
+      const row = document.createElement('tr');
+
+      const shiftCell = document.createElement('td');
+      shiftCell.textContent = shift.id;
+      row.appendChild(shiftCell);
+
+      const workerCell = document.createElement('td');
+      workerCell.innerHTML = '';
+      const workerName = document.createElement('div');
+      workerName.textContent = shift.workerName;
+      const workerWallet = document.createElement('small');
+      workerWallet.className = 'muted-text';
+      workerWallet.textContent = shortAddress(shift.workerWallet);
+      workerCell.appendChild(workerName);
+      workerCell.appendChild(workerWallet);
+      row.appendChild(workerCell);
+
+      const siteCell = document.createElement('td');
+      siteCell.innerHTML = '';
+      const site = document.createElement('div');
+      site.textContent = shift.siteId;
+      const task = document.createElement('small');
+      task.className = 'muted-text';
+      task.textContent = shift.taskId;
+      siteCell.appendChild(site);
+      siteCell.appendChild(task);
+      row.appendChild(siteCell);
+
+      const statusCell = document.createElement('td');
+      statusCell.appendChild(getStatusBadge(getShiftStatus(shift)));
+      row.appendChild(statusCell);
+
+      const clockCell = document.createElement('td');
+      clockCell.innerHTML = '';
+      const inTime = document.createElement('div');
+      inTime.textContent = `In: ${formatLocalDateTime(shift.clockedInAt)}`;
+      const outTime = document.createElement('small');
+      outTime.className = 'muted-text';
+      outTime.textContent = shift.clockedOutAt
+        ? `Out: ${formatLocalDateTime(shift.clockedOutAt)}`
+        : 'Out: ongoing';
+      clockCell.appendChild(inTime);
+      clockCell.appendChild(outTime);
+      row.appendChild(clockCell);
+
+      const accruedCell = document.createElement('td');
+      accruedCell.textContent = formatShiftAccrual(shift);
+      row.appendChild(accruedCell);
+
+      const reviewerCell = document.createElement('td');
+      reviewerCell.textContent = shortAddress(shift.reviewerWallet);
+      row.appendChild(reviewerCell);
+
+      const actionsCell = document.createElement('td');
+      const actionsWrap = document.createElement('div');
+      actionsWrap.className = 'actions-wrap';
+      if (!shift.clockedOutAt && !shift.settledAt) {
+        actionsWrap.appendChild(
+          createPayoutActionButton(
+            'Clock out',
+            `clock-out:${shift.id}`,
+            false,
+            () => handleClockOutShift(shift.id, 'worker'),
+          ),
+        );
+        actionsWrap.appendChild(
+          createPayoutActionButton(
+            'Reviewer close',
+            `reviewer-close:${shift.id}`,
+            false,
+            () => handleClockOutShift(shift.id, 'reviewer'),
+          ),
+        );
+      }
+      actionsWrap.appendChild(
+        createPayoutActionButton(
+          shift.settledAt ? 'Confirmed' : 'Review',
+          `review:${shift.id}`,
+          false,
+          () => {
+            if (payoutReviewShiftEl) payoutReviewShiftEl.value = shift.id;
+            hydratePayoutReviewForm();
+          },
+        ),
+      );
+      actionsCell.appendChild(actionsWrap);
+      row.appendChild(actionsCell);
+      payoutShiftsBodyEl.appendChild(row);
+    });
+}
+
+function renderPayoutLedgerTable() {
+  if (!payoutBodyEl) return;
+  payoutBodyEl.innerHTML = '';
+
+  const visibleShifts = payoutState.shifts.filter((shift) => Boolean(shift.clockedOutAt || shift.settledAt));
+  if (visibleShifts.length === 0) {
+    payoutBodyEl.innerHTML = '<tr><td colspan="7" class="payout-empty">No payout records yet.</td></tr>';
+    return;
+  }
+
+  visibleShifts
+    .slice()
+    .sort((a, b) => (b.settledAt || b.clockedOutAt) - (a.settledAt || a.clockedOutAt))
+    .forEach((shift) => {
+      const row = document.createElement('tr');
+      [shift.id, `${shift.workerName} · ${shortAddress(shift.workerWallet)}`, formatAmount(getShiftDisplayAmount(shift))].forEach(
+        (value) => {
+          const cell = document.createElement('td');
+          cell.textContent = value;
+          row.appendChild(cell);
+        },
+      );
+
+      const lifecycleCell = document.createElement('td');
+      lifecycleCell.appendChild(getStatusBadge(getShiftLifecycleLabel(shift)));
+      const lifecycleMeta = document.createElement('div');
+      lifecycleMeta.className = 'payout-meta-stack';
+      if (shift.ledgerEntryId) {
+        const entryMeta = document.createElement('small');
+        entryMeta.className = 'muted-text';
+        entryMeta.textContent = `Ledger entry #${shift.ledgerEntryId}`;
+        lifecycleMeta.appendChild(entryMeta);
+      }
+      if (shift.adjustmentReason) {
+        const note = document.createElement('small');
+        note.className = 'muted-text';
+        note.textContent = `Adjustment: ${shift.adjustmentReason}`;
+        lifecycleMeta.appendChild(note);
+      }
+      lifecycleCell.appendChild(lifecycleMeta);
+      row.appendChild(lifecycleCell);
+
+      const approverCell = document.createElement('td');
+      approverCell.textContent = shift.settledBy ? shortAddress(shift.settledBy) : '—';
+      row.appendChild(approverCell);
+
+      const settledCell = document.createElement('td');
+      settledCell.textContent = shift.settledAt ? formatLocalDateTime(shift.settledAt) : 'Awaiting proof';
+      row.appendChild(settledCell);
+
+      const proofCell = document.createElement('td');
+      const proofLinks = document.createElement('div');
+      proofLinks.className = 'payout-proof-links';
+      if (shift.proofUrl && isValidUrl(shift.proofUrl)) {
+        const proofLink = document.createElement('a');
+        proofLink.href = shift.proofUrl;
+        proofLink.target = '_blank';
+        proofLink.rel = 'noopener noreferrer';
+        proofLink.textContent = 'Transfer proof';
+        proofLinks.appendChild(proofLink);
+      }
+      if (shift.ledgerConfirmedTxHash) {
+        const txProof = document.createElement('a');
+        txProof.href = txLink(shift.ledgerConfirmedTxHash);
+        txProof.target = '_blank';
+        txProof.rel = 'noopener noreferrer';
+        txProof.textContent = 'Ledger confirmation tx';
+        proofLinks.appendChild(txProof);
+      }
+      if (proofLinks.childNodes.length === 0) {
+        const empty = document.createElement('span');
+        empty.className = 'muted-text';
+        empty.textContent = 'No proof yet';
+        proofLinks.appendChild(empty);
+      }
+      proofCell.appendChild(proofLinks);
+      row.appendChild(proofCell);
+
+      payoutBodyEl.appendChild(row);
+    });
+}
+
+function renderPayoutEventTable() {
+  if (!payoutEventsBodyEl) return;
+  payoutEventsBodyEl.innerHTML = '';
+  const events = getPayoutEventRows();
+
+  if (events.length === 0) {
+    payoutEventsBodyEl.innerHTML = '<tr><td colspan="6" class="payout-empty">No payout events logged yet.</td></tr>';
+    return;
+  }
+
+  events.slice(0, MAX_DISPLAYED_PAYOUT_EVENTS).forEach((event) => {
+    const row = document.createElement('tr');
+    [
+      formatLocalDateTime(event.clientTimestamp),
+      event.shiftId,
+      event.type,
+      shortAddress(event.actorWallet),
+      event.serverTimestamp || 'Unavailable',
+      event.notes || '—',
+    ].forEach((value) => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    payoutEventsBodyEl.appendChild(row);
+  });
+}
+
+function renderPayoutView() {
+  renderPayoutSummary();
+  renderPayoutWorkerStatus();
+  renderPayoutReviewOptions();
+  renderPayoutShiftTable();
+  renderPayoutLedgerTable();
+  renderPayoutEventTable();
+  if (payoutReviewShiftEl && payoutReviewShiftEl.value) hydratePayoutReviewForm(false);
+}
+
+async function handleGenerateQrPayload(event) {
+  event.preventDefault();
+  syncPayoutWalletDefaults();
+  const siteId = payoutSiteIdEl ? payoutSiteIdEl.value.trim() : '';
+  const taskId = payoutTaskIdEl ? payoutTaskIdEl.value.trim() : '';
+  const ratePerHour = Number(payoutHourlyRateEl ? payoutHourlyRateEl.value.trim() : 0);
+  const reviewerWallet = normalizeWallet(
+    (payoutQrReviewerWalletEl && payoutQrReviewerWalletEl.value) || currentAccount,
+  );
+
+  if (!siteId || !taskId) {
+    setPayoutStatus(payoutQrStatusEl, 'Site ID and task context are required to generate a QR payload.', 'error');
+    return;
+  }
+  if (!isValidHourlyRate(ratePerHour)) {
+    setPayoutStatus(
+      payoutQrStatusEl,
+      'Hourly rate must be a whole USD value divisible by 4 so each 15-minute accrual bucket stays ledger-safe.',
+      'error',
+    );
+    return;
+  }
+  if (!isWalletAddress(reviewerWallet)) {
+    setPayoutStatus(payoutQrStatusEl, 'Connect or enter a valid reviewer wallet to sign the QR payload.', 'error');
+    return;
+  }
+
+  const ethereumProvider = getEthereumProvider();
+  if (!ethereumProvider) {
+    setPayoutStatus(payoutQrStatusEl, 'Connect the reviewer/admin wallet before generating a signed QR payload.', 'error');
+    return;
+  }
+
+  try {
+    const browserProvider = new window.ethers.BrowserProvider(ethereumProvider, 'any');
+    const signer = await browserProvider.getSigner();
+    const signerAddress = normalizeWallet(await signer.getAddress());
+    if (signerAddress.toLowerCase() !== reviewerWallet.toLowerCase()) {
+      setPayoutStatus(
+        payoutQrStatusEl,
+        'The connected wallet must match the reviewer wallet embedded in the QR payload.',
+        'error',
+      );
+      return;
+    }
+
+    const payload = {
+      siteId,
+      taskId,
+      nonce: createActionId('nonce'),
+      issuedAt: new Date().toISOString(),
+      reviewerWallet,
+      ratePerHour,
+    };
+    payload.signature = await signer.signMessage(buildQrMessage(payload));
+
+    if (payoutGeneratedQrEl) payoutGeneratedQrEl.value = JSON.stringify(payload, null, 2);
+    if (payoutQrPayloadEl) payoutQrPayloadEl.value = JSON.stringify(payload, null, 2);
+    setPayoutStatus(
+      payoutQrStatusEl,
+      `Signed QR payload ready for ${siteId}/${taskId}. It expires in 10 minutes unless it is scanned first.`,
+      'success',
+    );
+  } catch (error) {
+    setPayoutStatus(payoutQrStatusEl, getErrorMessage(error, 'Unable to sign QR payload.'), 'error');
+  }
+}
+
+function parseSignedQrPayload(payloadText) {
+  let payload;
+  try {
+    payload = JSON.parse(payloadText);
+  } catch {
+    throw new Error('QR payload must be valid JSON.');
+  }
+
+  const siteId = String(payload.siteId || '').trim();
+  const taskId = String(payload.taskId || '').trim();
+  const nonce = String(payload.nonce || '').trim();
+  const issuedAt = String(payload.issuedAt || '').trim();
+  const reviewerWallet = normalizeWallet(payload.reviewerWallet);
+  const signature = String(payload.signature || '').trim();
+  const ratePerHour = Number(payload.ratePerHour);
+  const issuedAtMs = Date.parse(issuedAt);
+
+  if (!siteId || !taskId || !nonce || !issuedAt || !signature) {
+    throw new Error('QR payload is missing site, task, nonce, timestamp, or signature fields.');
+  }
+  if (!Number.isFinite(issuedAtMs)) {
+    throw new Error('QR payload timestamp is invalid.');
+  }
+  if (!isValidHourlyRate(ratePerHour)) {
+    throw new Error('QR payload hourly rate must be a whole USD value divisible by 4.');
+  }
+  if (!isWalletAddress(reviewerWallet)) {
+    throw new Error('QR payload reviewer wallet is invalid.');
+  }
+  const now = Date.now();
+  if (issuedAtMs > now || now - issuedAtMs > QR_EXPIRATION_WINDOW_MS) {
+    throw new Error('QR payload expired or is not yet valid. Generate a fresh signed QR code and try again.');
+  }
+  if (payoutState.usedNonces[buildNonceKey(siteId, nonce)]) {
+    throw new Error('This QR payload nonce has already been used. Duplicate clock-ins are blocked.');
+  }
+
+  const signedPayload = {
+    siteId,
+    taskId,
+    nonce,
+    issuedAt,
+    reviewerWallet,
+    ratePerHour,
+  };
+  const recoveredWallet = normalizeWallet(window.ethers.verifyMessage(buildQrMessage(signedPayload), signature));
+
+  if (recoveredWallet.toLowerCase() !== reviewerWallet.toLowerCase()) {
+    throw new Error('QR payload signature verification failed.');
+  }
+
+  return {
+    siteId,
+    taskId,
+    nonce,
+    issuedAt,
+    issuedAtMs,
+    reviewerWallet,
+    ratePerHour,
+    signature,
+  };
+}
+
+async function handleClockInSubmit(event) {
+  event.preventDefault();
+  const workerName = payoutWorkerNameEl ? payoutWorkerNameEl.value.trim() : '';
+  const workerWallet = normalizeWallet(payoutWorkerWalletEl ? payoutWorkerWalletEl.value : '');
+  const qrPayload = payoutQrPayloadEl ? payoutQrPayloadEl.value.trim() : '';
+
+  if (!workerName) {
+    setPayoutStatus(payoutWorkerStatusEl, 'Worker name is required.', 'error');
+    return;
+  }
+  if (!isWalletAddress(workerWallet)) {
+    setPayoutStatus(payoutWorkerStatusEl, 'Enter a valid worker wallet before clocking in.', 'error');
+    return;
+  }
+  if (!qrPayload) {
+    setPayoutStatus(payoutWorkerStatusEl, 'Paste the signed QR payload before clocking in.', 'error');
+    return;
+  }
+
+  let parsedPayload;
+  try {
+    parsedPayload = parseSignedQrPayload(qrPayload);
+  } catch (error) {
+    setPayoutStatus(payoutWorkerStatusEl, error.message, 'error');
+    return;
+  }
+
+  if (getActiveShiftForWorkerSite(workerWallet, parsedPayload.siteId)) {
+    setPayoutStatus(
+      payoutWorkerStatusEl,
+      'This worker already has an active shift at the selected site. Overlapping active intervals are blocked.',
+      'error',
+    );
+    return;
+  }
+
+  const clientTimestamp = new Date().toISOString();
+  const serverTimestamp = await getPayoutServerTimestamp();
+  const shift = {
+    id: createActionId('shift'),
+    siteId: parsedPayload.siteId,
+    taskId: parsedPayload.taskId,
+    qrNonce: parsedPayload.nonce,
+    qrIssuedAt: parsedPayload.issuedAt,
+    workerName,
+    workerWallet,
+    reviewerWallet: parsedPayload.reviewerWallet,
+    ratePerHour: parsedPayload.ratePerHour,
+    clockedInAt: Date.now(),
+    clockedOutAt: null,
+    closedBy: '',
+    proofUrl: '',
+    approvedAmount: null,
+    adjustmentReason: '',
+    ledgerEntryId: null,
+    ledgerAmount: null,
+    ledgerStatus: '',
+    ledgerRequestedTxHash: '',
+    ledgerCommittedTxHash: '',
+    ledgerConfirmedTxHash: '',
+    settlementIdempotencyKey: createActionId(`settle-${parsedPayload.siteId}`),
+    settledAt: null,
+    settledBy: '',
+    events: [],
+  };
+
+  appendShiftEvent(
+    shift,
+    'CLOCK_IN',
+    workerWallet,
+    clientTimestamp,
+    serverTimestamp,
+    `Signed QR from reviewer ${shortAddress(parsedPayload.reviewerWallet)}`,
+  );
+
+  payoutState.shifts.unshift(shift);
+  payoutState.usedNonces[buildNonceKey(parsedPayload.siteId, parsedPayload.nonce)] = shift.id;
+  savePayoutState();
+  renderPayoutView();
+  if (payoutClockInFormEl) payoutClockInFormEl.reset();
+  syncPayoutWalletDefaults();
+  setPayoutStatus(
+    payoutWorkerStatusEl,
+    `${workerName} clocked in at ${parsedPayload.siteId}. Accrual now ticks every 15 minutes.`,
+    'success',
+  );
+}
+
+async function closeShiftRecord(shift, closedBy, actorWallet) {
+  shift.clockedOutAt = Date.now();
+  shift.closedBy = closedBy;
+  const clientTimestamp = new Date().toISOString();
+  const serverTimestamp = await getPayoutServerTimestamp();
+  appendShiftEvent(
+    shift,
+    'CLOCK_OUT',
+    actorWallet,
+    clientTimestamp,
+    serverTimestamp,
+    closedBy === 'reviewer' ? 'Reviewer closed the shift.' : 'Worker clocked out.',
+  );
+  savePayoutState();
+}
+
+async function handleClockOutShift(shiftId, closedBy) {
+  const shift = findShiftById(shiftId);
+  if (!shift) return;
+  if (shift.clockedOutAt || shift.settledAt) {
+    setPayoutStatus(payoutReviewStatusEl, 'This shift is already closed.', 'error');
+    return;
+  }
+
+  const actionKey = `${closedBy === 'reviewer' ? 'reviewer-close' : 'clock-out'}:${shiftId}`;
+  if (payoutPendingActions.has(actionKey)) return;
+
+  setPayoutActionPending(actionKey, true);
+  try {
+    const actorWallet =
+      closedBy === 'reviewer'
+        ? normalizeWallet((payoutReviewerWalletEl && payoutReviewerWalletEl.value) || currentAccount || shift.reviewerWallet)
+        : shift.workerWallet;
+    await closeShiftRecord(shift, closedBy, actorWallet);
+    renderPayoutView();
+    setPayoutStatus(
+      closedBy === 'reviewer' ? payoutReviewStatusEl : payoutWorkerStatusEl,
+      `${shift.workerName} clocked out. Pending labor amount: ${formatAmount(getShiftAccruedAmount(shift))}.`,
+      'success',
+    );
+  } finally {
+    setPayoutActionPending(actionKey, false);
+  }
+}
+
+function hydratePayoutReviewForm(announce = true) {
+  if (!payoutReviewShiftEl) return;
+  const shift = findShiftById(payoutReviewShiftEl.value);
+  syncPayoutWalletDefaults();
+
+  if (!shift) {
+    if (payoutApprovedAmountEl) payoutApprovedAmountEl.value = '';
+    return;
+  }
+
+  if (payoutApprovedAmountEl && payoutApprovedAmountEl.value === '') {
+    payoutApprovedAmountEl.value = String(getShiftDisplayAmount(shift));
+  }
+  if (payoutProofUrlEl && !payoutProofUrlEl.value && shift.proofUrl) payoutProofUrlEl.value = shift.proofUrl;
+  if (payoutAdjustmentReasonEl && !payoutAdjustmentReasonEl.value && shift.adjustmentReason) {
+    payoutAdjustmentReasonEl.value = shift.adjustmentReason;
+  }
+  if (payoutReviewerWalletEl && !payoutReviewerWalletEl.value) {
+    payoutReviewerWalletEl.value = shift.reviewerWallet || currentAccount;
+  }
+
+  if (announce) {
+    setPayoutStatus(
+      payoutReviewStatusEl,
+      `${shift.workerName}: ${formatShiftAccrual(shift)} · ledger ${shift.ledgerEntryId ? `#${shift.ledgerEntryId}` : 'not synced yet'}.`,
+      'info',
+    );
+  }
+}
+
+async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reasonNote) {
+  if (!isAdminWallet) {
+    return { ok: false, message: 'Connect the admin wallet on Optimism to sync payout lifecycle artifacts to ProjectLedger.' };
+  }
+  if (!shift.clockedOutAt) {
+    await closeShiftRecord(shift, 'reviewer', reviewerWallet);
+  }
+
+  const actionKey = `ledger-request:${shift.id}`;
+  if (payoutPendingActions.has(actionKey)) {
+    return { ok: false, message: 'Ledger sync already in progress for this shift.' };
+  }
+
+  setPayoutActionPending(actionKey, true);
+  try {
+    const signerContract = await getSignerContract();
+    if (!signerContract) {
+      return { ok: false, message: 'Unable to access the signer contract.' };
+    }
+
+    if (shift.ledgerEntryId) {
+      if (
+        shift.ledgerAmount !== null &&
+        shift.ledgerAmount !== undefined &&
+        toWholeUsd(shift.ledgerAmount) !== approvedAmount &&
+        shift.ledgerStatus === STATUS_REQUESTED
+      ) {
+        const result = await runTransaction('Labor ledger amount update', () =>
+          signerContract.updatePendingAmount(
+            shift.ledgerEntryId,
+            BigInt(toWholeUsd(approvedAmount)),
+            reasonNote || 'Reviewer adjusted payout before transfer confirmation.',
+            '',
+          ),
+        );
+        if (!result) return { ok: false, message: 'Unable to update the pending labor amount on-chain.' };
+        shift.ledgerAmount = approvedAmount;
+        shift.ledgerStatus = STATUS_REQUESTED;
+        appendShiftEvent(
+          shift,
+          'LEDGER_REQUEST_UPDATED',
+          reviewerWallet,
+          new Date().toISOString(),
+          await getPayoutServerTimestamp(),
+          `Updated ProjectLedger entry #${shift.ledgerEntryId} to ${approvedAmount} USD.`,
+        );
+        savePayoutState();
+      }
+      return { ok: true, entryId: shift.ledgerEntryId };
+    }
+
+    const { contract: readContract } = getReadContract();
+    const previousTotal = toNumeric(await readContract.totalEntries());
+    const payload = buildShiftLedgerMetadata(shift, approvedAmount, reviewerWallet);
+    const result = await runTransaction('Labor request ledger sync', () =>
+      signerContract.createEntry(
+        TX_TYPE_OUTGOING,
+        ENTRY_STATUS_REQUESTED,
+        BigInt(toWholeUsd(approvedAmount)),
+        payload.category,
+        payload.description,
+        '',
+      ),
+    );
+    if (!result) return { ok: false, message: 'Unable to create the requested labor ledger entry.' };
+
+    shift.ledgerEntryId = previousTotal + 1;
+    shift.ledgerAmount = approvedAmount;
+    shift.ledgerStatus = STATUS_REQUESTED;
+    shift.ledgerRequestedTxHash = result.tx.hash;
+    appendShiftEvent(
+      shift,
+      'LEDGER_REQUEST_CREATED',
+      reviewerWallet,
+      new Date().toISOString(),
+      await getPayoutServerTimestamp(),
+      `Created ProjectLedger entry #${shift.ledgerEntryId} for ${approvedAmount} USD.`,
+    );
+    savePayoutState();
+    return { ok: true, entryId: shift.ledgerEntryId };
+  } finally {
+    setPayoutActionPending(actionKey, false);
+  }
+}
+
+async function handleSyncRequestedLedger() {
+  const shift = findShiftById(payoutReviewShiftEl ? payoutReviewShiftEl.value : '');
+  if (!shift) {
+    setPayoutStatus(payoutReviewStatusEl, 'Select a shift before syncing the requested ledger entry.', 'error');
+    return;
+  }
+
+  const approvedAmount = toWholeUsd(payoutApprovedAmountEl ? payoutApprovedAmountEl.value : 0);
+  const reviewerWallet = normalizeWallet((payoutReviewerWalletEl && payoutReviewerWalletEl.value) || currentAccount);
+  if (!isWalletAddress(reviewerWallet)) {
+    setPayoutStatus(payoutReviewStatusEl, 'Enter a valid reviewer wallet before syncing the ledger.', 'error');
+    return;
+  }
+  if (!Number.isInteger(approvedAmount) || approvedAmount < 0) {
+    setPayoutStatus(payoutReviewStatusEl, 'Approved amount must be a whole number greater than or equal to zero.', 'error');
+    return;
+  }
+  if (!shift.ledgerEntryId && approvedAmount < 1) {
+    setPayoutStatus(payoutReviewStatusEl, 'Requested ledger sync requires an approved amount of at least 1 USD.', 'error');
+    return;
+  }
+
+  const reasonNote = payoutAdjustmentReasonEl ? payoutAdjustmentReasonEl.value.trim() : '';
+  const result = await syncRequestedLedger(shift, approvedAmount, reviewerWallet, reasonNote);
+  renderPayoutView();
+  setPayoutStatus(
+    payoutReviewStatusEl,
+    result.ok
+      ? `Requested labor entry synced${shift.ledgerEntryId ? ` as #${shift.ledgerEntryId}` : ''}.`
+      : result.message,
+    result.ok ? 'success' : 'error',
+  );
+}
+
+async function handlePayoutReviewSubmit(event) {
+  event.preventDefault();
+  const shift = findShiftById(payoutReviewShiftEl ? payoutReviewShiftEl.value : '');
+  if (!shift) {
+    setPayoutStatus(payoutReviewStatusEl, 'Select a shift before approving or settling.', 'error');
+    return;
+  }
+
+  const reviewerWallet = normalizeWallet((payoutReviewerWalletEl && payoutReviewerWalletEl.value) || currentAccount);
+  const approvedAmount = toWholeUsd(payoutApprovedAmountEl ? payoutApprovedAmountEl.value : 0);
+  const proofUrl = payoutProofUrlEl ? payoutProofUrlEl.value.trim() : '';
+  const adjustmentReason = payoutAdjustmentReasonEl ? payoutAdjustmentReasonEl.value.trim() : '';
+  const syncLedgerSelection = Boolean(payoutSyncLedgerEl && payoutSyncLedgerEl.checked);
+  const accruedAmount = toWholeUsd(getShiftAccruedAmount(shift));
+
+  if (!isWalletAddress(reviewerWallet)) {
+    setPayoutStatus(payoutReviewStatusEl, 'Reviewer wallet is required and must be valid.', 'error');
+    return;
+  }
+  if (!Number.isInteger(approvedAmount) || approvedAmount < 0) {
+    setPayoutStatus(payoutReviewStatusEl, 'Approved amount must be a whole USD number greater than or equal to zero.', 'error');
+    return;
+  }
+  if (!proofUrl || !isValidUrl(proofUrl)) {
+    setPayoutStatus(payoutReviewStatusEl, 'A valid transfer proof URL is required to confirm the transfer.', 'error');
+    return;
+  }
+  if (syncLedgerSelection && approvedAmount < 1) {
+    setPayoutStatus(payoutReviewStatusEl, 'Public-ledger confirmation requires an approved amount of at least 1 USD.', 'error');
+    return;
+  }
+  if (approvedAmount < accruedAmount && !adjustmentReason) {
+    setPayoutStatus(payoutReviewStatusEl, 'A reason is required for a downward payout adjustment.', 'error');
+    return;
+  }
+  if (approvedAmount > accruedAmount && !adjustmentReason) {
+    setPayoutStatus(payoutReviewStatusEl, 'A reason is required when settling above the accrued amount.', 'error');
+    return;
+  }
+  if (shift.settledAt || isProcessedAction(shift.settlementIdempotencyKey)) {
+    setPayoutStatus(payoutReviewStatusEl, 'This shift has already been confirmed. Duplicate transfer confirmation is blocked.', 'error');
+    return;
+  }
+  if (payoutPendingActions.has(shift.settlementIdempotencyKey)) {
+    setPayoutStatus(payoutReviewStatusEl, 'Transfer confirmation already in progress for this shift.', 'error');
+    return;
+  }
+
+  setPayoutActionPending(shift.settlementIdempotencyKey, true);
+  try {
+    if (!shift.clockedOutAt) {
+      await closeShiftRecord(shift, 'reviewer', reviewerWallet);
+    }
+
+    if (syncLedgerSelection) {
+      const requestSync = await syncRequestedLedger(shift, approvedAmount, reviewerWallet, adjustmentReason);
+      if (!requestSync.ok) {
+        setPayoutStatus(payoutReviewStatusEl, requestSync.message, 'error');
+        return;
+      }
+
+      const signerContract = await getSignerContract();
+      if (!signerContract) {
+        setPayoutStatus(payoutReviewStatusEl, 'Unable to access the signer contract for transfer confirmation.', 'error');
+        return;
+      }
+
+      if (shift.ledgerStatus !== STATUS_COMMITTED && shift.ledgerStatus !== STATUS_CONFIRMED) {
+        const commitResult = await runTransaction('Labor approval commit', () =>
+          signerContract.updateStatus(shift.ledgerEntryId, ENTRY_STATUS_COMMITTED),
+        );
+        if (!commitResult) {
+          setPayoutStatus(payoutReviewStatusEl, 'Unable to commit the requested labor entry.', 'error');
+          return;
+        }
+        shift.ledgerStatus = STATUS_COMMITTED;
+        shift.ledgerCommittedTxHash = commitResult.tx.hash;
+        appendShiftEvent(
+          shift,
+          'LEDGER_COMMITTED',
+          reviewerWallet,
+          new Date().toISOString(),
+          await getPayoutServerTimestamp(),
+          `Committed ProjectLedger entry #${shift.ledgerEntryId}.`,
+        );
+      }
+
+      const confirmResult = await runTransaction('Labor transfer confirmation', () =>
+        signerContract.confirmEntry(shift.ledgerEntryId, proofUrl),
+      );
+      if (!confirmResult) {
+        setPayoutStatus(payoutReviewStatusEl, 'Unable to confirm the labor transfer entry.', 'error');
+        return;
+      }
+      shift.ledgerStatus = STATUS_CONFIRMED;
+      shift.ledgerConfirmedTxHash = confirmResult.tx.hash;
+    }
+
+    shift.approvedAmount = approvedAmount;
+    shift.adjustmentReason = adjustmentReason;
+    shift.proofUrl = proofUrl;
+    shift.reviewerWallet = reviewerWallet;
+    shift.settledAt = Date.now();
+    shift.settledBy = reviewerWallet;
+    appendShiftEvent(
+      shift,
+      'SETTLED',
+      reviewerWallet,
+      new Date().toISOString(),
+      await getPayoutServerTimestamp(),
+      syncLedgerSelection && shift.ledgerEntryId
+        ? `Confirmed via ProjectLedger entry #${shift.ledgerEntryId}.`
+        : 'Transfer completed externally without public ledger sync.',
+    );
+    recordProcessedAction(shift.settlementIdempotencyKey, {
+      shiftId: shift.id,
+      ledgerEntryId: shift.ledgerEntryId,
+    });
+    savePayoutState();
+    renderPayoutView();
+    setPayoutStatus(
+      payoutReviewStatusEl,
+      `Shift ${shift.id} confirmed${shift.ledgerEntryId ? ` with ProjectLedger entry #${shift.ledgerEntryId}` : ''}.`,
+      'success',
+    );
+  } finally {
+    setPayoutActionPending(shift.settlementIdempotencyKey, false);
+  }
+}
+
+function handleUseAccruedAmount() {
+  const shift = findShiftById(payoutReviewShiftEl ? payoutReviewShiftEl.value : '');
+  if (!shift || !payoutApprovedAmountEl) return;
+  payoutApprovedAmountEl.value = String(getShiftAccruedAmount(shift));
+  hydratePayoutReviewForm();
+}
+
 async function connectWallet() {
   const ethereumProvider = getEthereumProvider();
   if (!ethereumProvider) {
@@ -1092,10 +2205,42 @@ async function init() {
     entryFormEl.addEventListener('submit', handleEntrySubmit);
   }
 
+  if (payoutQrGeneratorFormEl) {
+    payoutQrGeneratorFormEl.addEventListener('submit', handleGenerateQrPayload);
+  }
+
+  if (payoutClockInFormEl) {
+    payoutClockInFormEl.addEventListener('submit', handleClockInSubmit);
+  }
+
+  if (payoutReviewShiftEl) {
+    payoutReviewShiftEl.addEventListener('change', () => {
+      if (payoutApprovedAmountEl) payoutApprovedAmountEl.value = '';
+      if (payoutAdjustmentReasonEl) payoutAdjustmentReasonEl.value = '';
+      if (payoutProofUrlEl) payoutProofUrlEl.value = '';
+      hydratePayoutReviewForm();
+    });
+  }
+
+  if (payoutUseAccruedBtnEl) {
+    payoutUseAccruedBtnEl.addEventListener('click', handleUseAccruedAmount);
+  }
+
+  if (payoutSyncLedgerBtnEl) {
+    payoutSyncLedgerBtnEl.addEventListener('click', handleSyncRequestedLedger);
+  }
+
+  if (payoutReviewFormEl) {
+    payoutReviewFormEl.addEventListener('submit', handlePayoutReviewSubmit);
+  }
+
   // Set Ledger as the default active view on load
   setActiveView('ledger');
 
   bindWalletEvents();
+  syncPayoutWalletDefaults();
+  renderPayoutView();
+  hydratePayoutReviewForm();
   await refreshWalletState();
   await refreshLedger();
 }

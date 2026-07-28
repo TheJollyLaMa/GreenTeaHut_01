@@ -194,7 +194,7 @@
 
         <section class="entry-section" aria-label="Add Entry to the Books">
           <h2 class="ledger-heading">Add Entry to the Books</h2>
-          <p class="entry-helper">New entries are added on-chain as PENDING (expected incoming) or REQUESTED (expected outgoing). Confirm/Settle from the table when proof is ready. Use "Revise Amount" to update an estimate before settlement.</p>
+          <p class="entry-helper">New entries are added on-chain as PENDING (expected incoming) or REQUESTED (expected outgoing). Move outgoing entries to COMMITTED when approved and use "Confirm Transfer" only after the transfer is complete and proof is ready. Use "Revise Amount" to update an estimate before confirmation.</p>
           <form id="entry-form" class="entry-form" novalidate>
             <label for="entry-type">
               Type
@@ -297,39 +297,164 @@
     <div id="payout-view" class="payout-view" hidden aria-label="Labor &amp; Services Payout">
       <section class="payout-section" aria-label="Payout overview">
         <h2 class="payout-heading">🎖️ Labor &amp; Services Payout</h2>
-        <p class="payout-intro">Transparent compensation flows — who was paid, for what work, from which funding source, and in what amount.</p>
-      </section>
-
-      <section class="payout-section" aria-label="Workers and collaborators">
-        <h3 class="payout-subheading">👷 Workers &amp; Collaborators</h3>
-        <p class="payout-todo"><!-- TODO: render contributor identity, role, and contribution context from on-chain or off-chain data --></p>
-        <div class="payout-placeholder">
-          <p>No contributors listed yet. Contributor records will appear here once payout data is available.</p>
+        <p class="payout-intro">Clock workers in with signed QR payloads, accrue labor in 15-minute buckets, and record each completed transfer exactly once with proof.</p>
+        <div class="payout-summary-grid" aria-label="Payout summary">
+          <article class="payout-summary-card">
+            <span class="payout-kpi-label">Active shifts</span>
+            <strong id="payout-active-count" class="payout-kpi">0</strong>
+          </article>
+          <article class="payout-summary-card">
+            <span class="payout-kpi-label">Completed shifts</span>
+            <strong id="payout-completed-count" class="payout-kpi">0</strong>
+          </article>
+          <article class="payout-summary-card">
+            <span class="payout-kpi-label">Requested labor total</span>
+            <strong id="payout-requested-total" class="payout-kpi">$0.00</strong>
+          </article>
+          <article class="payout-summary-card">
+            <span class="payout-kpi-label">Confirmed labor total</span>
+            <strong id="payout-settled-total" class="payout-kpi">$0.00</strong>
+          </article>
+        </div>
+        <div class="payout-note">
+          <p><strong>MVP guardrails:</strong> one active shift per worker per site, signed QR nonce replay protection, 10-minute QR freshness, and one-time transfer confirmation per shift.</p>
+          <p><strong>MVP payment handling:</strong> Payments are recorded here; transfer is executed externally in MVP.</p>
+          <p><strong>Status guide:</strong> <code>COMMITTED</code> = approved, awaiting transfer. <code>CONFIRMED</code> = transfer completed + proof attached.</p>
+          <p><strong>Deployment recommendation:</strong> use <strong>Option 1</strong> for this MVP — keep `ProjectLedger` as the public record of requested/committed/confirmed labor payouts and execute payout settlement off-chain. <strong>Option 2</strong> remains a future path if on-chain escrow or ABI-level shift state becomes necessary.</p>
         </div>
       </section>
 
-      <section class="payout-section" aria-label="Payout mechanisms">
-        <h3 class="payout-subheading">⚙️ Payout Mechanisms</h3>
-        <p class="payout-todo"><!-- TODO: support fixed fee, hourly, milestone, split, retroactive/public-goods rewards --></p>
-        <div class="payout-placeholder">
-          <p>Payout mechanism details will be shown here (fixed fee, hourly, milestone, split, retroactive).</p>
+      <section class="payout-section payout-grid" aria-label="QR clock controls">
+        <div class="payout-card">
+          <h3 class="payout-subheading">🪪 QR issuance</h3>
+          <p class="payout-copy">Reviewer-signed QR payloads carry the site, task, nonce, timestamp, and hourly rate used by the worker clock-in flow.</p>
+          <form id="payout-qr-generator-form" class="payout-form-grid">
+            <label class="payout-field">
+              <span>Site ID</span>
+              <input id="payout-site-id" name="siteId" type="text" placeholder="green-tea-hut-1" required />
+            </label>
+            <label class="payout-field">
+              <span>Task / Shift Context</span>
+              <input id="payout-task-id" name="taskId" type="text" placeholder="tea-service-prep" required />
+            </label>
+            <label class="payout-field">
+              <span>Hourly rate (USD, multiple of 4)</span>
+              <input id="payout-hourly-rate" name="hourlyRate" type="number" min="4" step="4" value="40" required />
+            </label>
+            <label class="payout-field">
+              <span>Reviewer wallet</span>
+              <input id="payout-qr-reviewer-wallet" name="reviewerWallet" type="text" placeholder="0x..." />
+            </label>
+            <button type="submit" class="entry-submit">Generate signed QR payload</button>
+          </form>
+          <label class="payout-field">
+            <span>Signed payload</span>
+            <textarea id="payout-generated-qr" class="payout-output" rows="7" readonly placeholder="Connect the reviewer wallet, then generate a signed QR payload."></textarea>
+          </label>
+          <p id="payout-qr-status" class="payout-status" aria-live="polite"></p>
+        </div>
+
+        <div class="payout-card">
+          <h3 class="payout-subheading">🕒 Worker clock in</h3>
+          <p class="payout-copy">Paste the scanned QR payload and bind it to the worker wallet. Duplicate clock-ins and reused QR nonces are blocked.</p>
+          <form id="payout-clock-in-form" class="payout-form-grid">
+            <label class="payout-field">
+              <span>Worker name</span>
+              <input id="payout-worker-name" name="workerName" type="text" placeholder="Worker display name" required />
+            </label>
+            <label class="payout-field">
+              <span>Worker wallet</span>
+              <input id="payout-worker-wallet" name="workerWallet" type="text" placeholder="0x..." required />
+            </label>
+            <label class="payout-field payout-field-full">
+              <span>Scanned QR payload</span>
+              <textarea id="payout-qr-payload" name="qrPayload" rows="7" placeholder='{"siteId":"...","taskId":"...","nonce":"...","issuedAt":"...","reviewerWallet":"0x...","ratePerHour":40,"signature":"0x..."}' required></textarea>
+            </label>
+            <button id="payout-clock-in-btn" type="submit" class="entry-submit">Clock in</button>
+          </form>
+          <p id="payout-worker-status" class="payout-status" aria-live="polite"></p>
         </div>
       </section>
 
-      <section class="payout-section" aria-label="Payment ledger">
-        <h3 class="payout-subheading">📒 Payment Ledger</h3>
-        <p class="payout-todo"><!-- TODO: connect to on-chain payout ledger; display amount, currency/asset, status, timestamp --></p>
+      <section class="payout-section" aria-label="Shift list">
+        <h3 class="payout-subheading">👷 Shift list</h3>
+        <p class="payout-copy">Active shifts accrue every 15 minutes. Workers can clock out themselves, or a reviewer can close the shift before approval.</p>
         <div class="table-wrap">
           <table class="payout-table">
             <thead>
               <tr>
-                <th>Contributor</th>
-                <th>Role / Task</th>
-                <th>Amount</th>
-                <th>Asset</th>
-                <th>Funding Source</th>
+                <th>Shift</th>
+                <th>Worker</th>
+                <th>Site / Task</th>
                 <th>Status</th>
-                <th>Date</th>
+                <th>Clock window</th>
+                <th>Accrued</th>
+                <th>Reviewer</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="payout-shifts-body">
+              <tr>
+                <td colspan="8" class="payout-empty">No shifts recorded yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="payout-section" aria-label="Reviewer approval and transfer confirmation">
+        <h3 class="payout-subheading">✅ Reviewer approval &amp; transfer confirmation</h3>
+        <p class="payout-copy">Reviewers can approve the full accrued amount or confirm an adjusted transfer after it is completed externally. Any manual adjustment should include a reason, and public ledger sync requires the admin wallet.</p>
+        <form id="payout-review-form" class="payout-form-grid">
+          <label class="payout-field">
+            <span>Shift</span>
+            <select id="payout-review-shift" name="shiftId">
+              <option value="">Select a shift</option>
+            </select>
+          </label>
+          <label class="payout-field">
+            <span>Reviewer wallet</span>
+            <input id="payout-reviewer-wallet" name="reviewerWallet" type="text" placeholder="0x..." />
+          </label>
+          <label class="payout-field">
+            <span>Approved amount (USD)</span>
+            <input id="payout-approved-amount" name="approvedAmount" type="number" min="0" step="1" placeholder="0" />
+          </label>
+          <label class="payout-field payout-field-full">
+            <span>Adjustment note</span>
+            <textarea id="payout-adjustment-reason" name="adjustmentReason" rows="3" placeholder="Required for downward adjustments."></textarea>
+          </label>
+          <label class="payout-field payout-field-full">
+            <span>Transfer proof URL</span>
+            <input id="payout-proof-url" name="proofUrl" type="url" placeholder="https://..." />
+          </label>
+          <label class="payout-checkbox">
+            <input id="payout-sync-ledger" name="syncLedger" type="checkbox" checked />
+            <span>Sync this payout record to the public `ProjectLedger` lifecycle</span>
+          </label>
+          <div class="payout-inline-actions">
+            <button id="payout-use-accrued" type="button" class="table-action">Use accrued amount</button>
+            <button id="payout-sync-ledger-btn" type="button" class="table-action">Sync requested ledger</button>
+            <button id="payout-settle-btn" type="submit" class="entry-submit">Approve &amp; confirm transfer</button>
+          </div>
+        </form>
+        <p id="payout-review-status" class="payout-status" aria-live="polite"></p>
+      </section>
+
+      <section class="payout-section" aria-label="Payout record ledger">
+        <h3 class="payout-subheading">📒 Payout record ledger</h3>
+        <p class="payout-copy">Each shift tracks its local review state plus any linked public-ledger entry, confirmation status, approver, transfer confirmation timestamp, and proof link.</p>
+        <div class="table-wrap">
+          <table class="payout-table">
+            <thead>
+              <tr>
+                <th>Shift</th>
+                <th>Worker</th>
+                <th>Amount</th>
+                <th>Lifecycle</th>
+                <th>Approved by</th>
+                <th>Confirmed</th>
+                <th>Proof</th>
               </tr>
             </thead>
             <tbody id="payout-body">
@@ -341,19 +466,27 @@
         </div>
       </section>
 
-      <section class="payout-section" aria-label="Funding sources">
-        <h3 class="payout-subheading">💰 Funding Sources</h3>
-        <p class="payout-todo"><!-- TODO: display donor, collector, fan pool, and other funding origin details --></p>
-        <div class="payout-placeholder">
-          <p>Funding source details (donors, collectors, fan pools) will appear here.</p>
-        </div>
-      </section>
-
-      <section class="payout-section" aria-label="Task-level attribution">
-        <h3 class="payout-subheading">🗂️ Task-Level Attribution</h3>
-        <p class="payout-todo"><!-- TODO: link payments to specific tasks or work items --></p>
-        <div class="payout-placeholder">
-          <p>Task and work-item attribution will be shown here once payout data is linked.</p>
+      <section class="payout-section" aria-label="Shift event log">
+        <h3 class="payout-subheading">🗂️ Shift event log</h3>
+        <p class="payout-copy">Clock-in, clock-out, ledger sync, and transfer confirmation events capture worker/reviewer identity plus client and server timestamps when available.</p>
+        <div class="table-wrap">
+          <table class="payout-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Shift</th>
+                <th>Event</th>
+                <th>Actor</th>
+                <th>Server time</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="payout-events-body">
+              <tr>
+                <td colspan="6" class="payout-empty">No payout events logged yet.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
     </div><!-- #payout-view -->
