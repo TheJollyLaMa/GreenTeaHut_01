@@ -258,6 +258,10 @@ function toWholeUsd(value) {
   return Number.isFinite(amount) ? Math.round(amount) : 0;
 }
 
+function isValidHourlyRate(rate) {
+  return Number.isInteger(rate) && rate >= MIN_HOURLY_RATE_USD && rate % ACCRUAL_BUCKETS_PER_HOUR === 0;
+}
+
 function getErrorMessage(error, fallback = 'An unexpected error occurred. Please try again.') {
   // Prefer the decoded revert reason (e.g. "Native must use 18 decimals") when available.
   // ethers.js v6 surfaces this as `reason`; also try `shortMessage` for ABI-decoded errors,
@@ -333,6 +337,10 @@ function createActionId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function buildNonceKey(siteId, nonce) {
+  return `${siteId}:${nonce}`;
+}
+
 function buildQrMessage(payload) {
   return [
     'GreenTeaHut Labor QR',
@@ -391,7 +399,7 @@ function getShiftAccruedBuckets(shift, now = Date.now()) {
 
 function getShiftAccruedAmount(shift, now = Date.now()) {
   const hourlyRate = Number(shift.ratePerHour || 0);
-  if (!Number.isInteger(hourlyRate) || hourlyRate < MIN_HOURLY_RATE_USD || hourlyRate % ACCRUAL_BUCKETS_PER_HOUR !== 0) {
+  if (!isValidHourlyRate(hourlyRate)) {
     return 0;
   }
   return getShiftAccruedBuckets(shift, now) * (hourlyRate / ACCRUAL_BUCKETS_PER_HOUR);
@@ -758,6 +766,7 @@ async function runTransaction(label, action) {
     const receipt = await tx.wait();
     setTxStatus(`${label} confirmed.`, 'success', tx.hash);
     await refreshLedger();
+    // Multi-step payout flows reuse the tx hash immediately and may need the receipt later.
     return { tx, receipt };
   } catch (error) {
     setTxStatus(getErrorMessage(error, 'Transaction failed. Please try again.'), 'error');
@@ -1430,7 +1439,7 @@ function renderPayoutShiftTable() {
       outTime.className = 'muted-text';
       outTime.textContent = shift.clockedOutAt
         ? `Out: ${formatLocalDateTime(shift.clockedOutAt)}`
-        : 'Out: active';
+        : 'Out: ongoing';
       clockCell.appendChild(inTime);
       clockCell.appendChild(outTime);
       row.appendChild(clockCell);
@@ -1615,11 +1624,7 @@ async function handleGenerateQrPayload(event) {
     setPayoutStatus(payoutQrStatusEl, 'Site ID and task context are required to generate a QR payload.', 'error');
     return;
   }
-  if (
-    !Number.isInteger(ratePerHour) ||
-    ratePerHour < MIN_HOURLY_RATE_USD ||
-    ratePerHour % ACCRUAL_BUCKETS_PER_HOUR !== 0
-  ) {
+  if (!isValidHourlyRate(ratePerHour)) {
     setPayoutStatus(
       payoutQrStatusEl,
       'Hourly rate must be a whole USD value divisible by 4 so each 15-minute accrual bucket stays ledger-safe.',
@@ -1696,20 +1701,17 @@ function parseSignedQrPayload(payloadText) {
   if (!Number.isFinite(issuedAtMs)) {
     throw new Error('QR payload timestamp is invalid.');
   }
-  if (
-    !Number.isInteger(ratePerHour) ||
-    ratePerHour < MIN_HOURLY_RATE_USD ||
-    ratePerHour % ACCRUAL_BUCKETS_PER_HOUR !== 0
-  ) {
+  if (!isValidHourlyRate(ratePerHour)) {
     throw new Error('QR payload hourly rate must be a whole USD value divisible by 4.');
   }
   if (!isWalletAddress(reviewerWallet)) {
     throw new Error('QR payload reviewer wallet is invalid.');
   }
-  if (issuedAtMs > Date.now() || Date.now() - issuedAtMs > QR_EXPIRATION_WINDOW_MS) {
+  const now = Date.now();
+  if (issuedAtMs > now || now - issuedAtMs > QR_EXPIRATION_WINDOW_MS) {
     throw new Error('QR payload expired or is not yet valid. Generate a fresh signed QR code and try again.');
   }
-  if (payoutState.usedNonces[`${siteId}:${nonce}`]) {
+  if (payoutState.usedNonces[buildNonceKey(siteId, nonce)]) {
     throw new Error('This QR payload nonce has already been used. Duplicate clock-ins are blocked.');
   }
 
@@ -1815,7 +1817,7 @@ async function handleClockInSubmit(event) {
   );
 
   payoutState.shifts.unshift(shift);
-  payoutState.usedNonces[`${parsedPayload.siteId}:${parsedPayload.nonce}`] = shift.id;
+  payoutState.usedNonces[buildNonceKey(parsedPayload.siteId, parsedPayload.nonce)] = shift.id;
   savePayoutState();
   renderPayoutView();
   if (payoutClockInFormEl) payoutClockInFormEl.reset();
@@ -1923,7 +1925,12 @@ async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reason
     }
 
     if (shift.ledgerEntryId) {
-      if (toWholeUsd(shift.ledgerAmount) !== approvedAmount && shift.ledgerStatus === STATUS_REQUESTED) {
+      if (
+        shift.ledgerAmount !== null &&
+        shift.ledgerAmount !== undefined &&
+        toWholeUsd(shift.ledgerAmount) !== approvedAmount &&
+        shift.ledgerStatus === STATUS_REQUESTED
+      ) {
         const result = await runTransaction('Labor ledger amount update', () =>
           signerContract.updatePendingAmount(
             shift.ledgerEntryId,
@@ -2047,14 +2054,12 @@ async function handlePayoutReviewSubmit(event) {
     setPayoutStatus(payoutReviewStatusEl, 'Public-ledger settlement requires an approved amount of at least 1 USD.', 'error');
     return;
   }
-  if (approvedAmount !== accruedAmount && !adjustmentReason) {
-    setPayoutStatus(
-      payoutReviewStatusEl,
-      approvedAmount < accruedAmount
-        ? 'A reason is required for a downward payout adjustment.'
-        : 'A reason is required when settling above the accrued amount.',
-      'error',
-    );
+  if (approvedAmount < accruedAmount && !adjustmentReason) {
+    setPayoutStatus(payoutReviewStatusEl, 'A reason is required for a downward payout adjustment.', 'error');
+    return;
+  }
+  if (approvedAmount > accruedAmount && !adjustmentReason) {
+    setPayoutStatus(payoutReviewStatusEl, 'A reason is required when settling above the accrued amount.', 'error');
     return;
   }
   if (shift.settledAt || isProcessedAction(shift.settlementIdempotencyKey)) {
