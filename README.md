@@ -40,7 +40,7 @@ Project funding and spending are tracked alongside milestone progress and displa
 ### Labor & Services Payout MVP
 - The existing `🎖️` toolbar view now supports signed QR clock-in payloads, 15-minute accrual tracking, reviewer approval, single-settlement guards, and payout proof links.
 - Shift records are stored locally in the browser for this MVP and can be synced into `ProjectLedger` as outgoing labor entries using the existing `REQUESTED → COMMITTED → CONFIRMED` lifecycle.
-- Reviewer-led downward adjustments require a reason note before settlement.
+- Reviewer-led adjustments should include a reason note before settlement, with downward adjustments enforced as mandatory.
 
 ### Payout deployment recommendation
 - **Option 1 — recommended for this MVP:** keep the existing `ProjectLedger` contract and use it as the public record for requested, approved, and confirmed labor payouts while actual payout execution happens off-chain.

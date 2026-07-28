@@ -385,8 +385,11 @@ function getShiftAccruedBuckets(shift, now = Date.now()) {
 }
 
 function getShiftAccruedAmount(shift, now = Date.now()) {
-  const bucketAmount = Number(shift.ratePerHour || 0) / ACCRUAL_BUCKETS_PER_HOUR;
-  return Math.round(getShiftAccruedBuckets(shift, now) * bucketAmount);
+  const hourlyRate = Number(shift.ratePerHour || 0);
+  if (!Number.isInteger(hourlyRate) || hourlyRate < MIN_HOURLY_RATE_USD || hourlyRate % ACCRUAL_BUCKETS_PER_HOUR !== 0) {
+    return 0;
+  }
+  return getShiftAccruedBuckets(shift, now) * (hourlyRate / ACCRUAL_BUCKETS_PER_HOUR);
 }
 
 function formatShiftAccrual(shift) {
@@ -396,7 +399,7 @@ function formatShiftAccrual(shift) {
 }
 
 function getShiftDisplayAmount(shift) {
-  if (typeof shift.approvedAmount === 'number') return shift.approvedAmount;
+  if (typeof shift.approvedAmount === 'number') return Math.round(shift.approvedAmount);
   return getShiftAccruedAmount(shift);
 }
 
@@ -1698,7 +1701,7 @@ function parseSignedQrPayload(payloadText) {
   if (!isWalletAddress(reviewerWallet)) {
     throw new Error('QR payload reviewer wallet is invalid.');
   }
-  if (Math.abs(Date.now() - issuedAtMs) > QR_EXPIRATION_WINDOW_MS) {
+  if (issuedAtMs > Date.now() || Date.now() - issuedAtMs > QR_EXPIRATION_WINDOW_MS) {
     throw new Error('QR payload expired or is not yet valid. Generate a fresh signed QR code and try again.');
   }
   if (payoutState.usedNonces[`${siteId}:${nonce}`]) {
@@ -1914,7 +1917,7 @@ async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reason
     }
 
     if (shift.ledgerEntryId) {
-      if (shift.ledgerAmount !== approvedAmount && shift.ledgerStatus === STATUS_REQUESTED) {
+      if (Math.round(Number(shift.ledgerAmount)) !== approvedAmount && shift.ledgerStatus === STATUS_REQUESTED) {
         const result = await runTransaction('Labor ledger amount update', () =>
           signerContract.updatePendingAmount(
             shift.ledgerEntryId,
@@ -2038,8 +2041,14 @@ async function handlePayoutReviewSubmit(event) {
     setPayoutStatus(payoutReviewStatusEl, 'Public-ledger settlement requires an approved amount of at least 1 USD.', 'error');
     return;
   }
-  if (approvedAmount < accruedAmount && !adjustmentReason) {
-    setPayoutStatus(payoutReviewStatusEl, 'A reason is required for a downward payout adjustment.', 'error');
+  if (approvedAmount !== accruedAmount && !adjustmentReason) {
+    setPayoutStatus(
+      payoutReviewStatusEl,
+      approvedAmount < accruedAmount
+        ? 'A reason is required for a downward payout adjustment.'
+        : 'A reason is required when settling above the accrued amount.',
+      'error',
+    );
     return;
   }
   if (shift.settledAt || isProcessedAction(shift.settlementIdempotencyKey)) {
