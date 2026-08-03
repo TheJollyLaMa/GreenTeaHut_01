@@ -170,7 +170,16 @@
         </section>
 
         <section aria-label="Ledger entries">
-          <h2 class="ledger-heading">📜 Public Ledger</h2>
+          <h2 class="ledger-heading ledger-heading-row">
+            <span>📜 Public Ledger</span>
+            <a
+              id="ledger-contract-link"
+              class="ledger-contract-link"
+              target="_blank"
+              rel="noopener noreferrer"
+              hidden
+            ></a>
+          </h2>
           <p id="tx-status" class="tx-status" aria-live="polite"></p>
           <div class="table-wrap">
             <table>
