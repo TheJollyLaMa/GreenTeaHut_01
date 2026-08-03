@@ -146,6 +146,8 @@ const PROJECT_LEDGER_ABI = [
   'function confirmEntry(uint256 entryId, string referenceURI)',
   'function updateReferenceURI(uint256 entryId, string referenceURI)',
   'function updatePendingAmount(uint256 entryId, uint256 newAmount, string reason, string referenceURI)',
+  // Events — required for queryFilter to decode logs
+  'event AmountUpdated(uint256 indexed id, uint256 oldAmount, uint256 newAmount, address indexed updatedBy, string reason, string referenceURI)',
 ];
 
 const STATUS_PENDING = 'PENDING';
@@ -233,6 +235,8 @@ let connectedChainId = null;
 let isAdminWallet = false;
 // Cached ABI compatibility result for display in wallet panel.
 let lastAbiStatus = '';
+// Track which entry rows have their revision history expanded across re-renders.
+const expandedEntries = new Set();
 
 const ABI_STATUS_COMPATIBLE = 'Compatible ✓';
 
@@ -775,6 +779,153 @@ function createTimestampCell(entry) {
   return dateCell;
 }
 
+function createRevisionDetailRow(entry) {
+  const detailRow = document.createElement('tr');
+  detailRow.className = 'detail-row';
+  detailRow.dataset.entryId = String(entry.id);
+
+  const detailCell = document.createElement('td');
+  detailCell.colSpan = 10;
+  detailCell.className = 'detail-cell';
+
+  const heading = document.createElement('p');
+  heading.className = 'revision-heading';
+  heading.textContent = `Revision history — entry #${entry.id}`;
+  detailCell.appendChild(heading);
+
+  if (entry.revisions && entry.revisions.length > 0) {
+    const timeline = document.createElement('ol');
+    timeline.className = 'revision-timeline';
+
+    entry.revisions.forEach((rev, index) => {
+      const item = document.createElement('li');
+      item.className = 'revision-item';
+
+      const header = document.createElement('div');
+      header.className = 'revision-item-header';
+      header.textContent = `Revision ${index + 1}: ${formatAmount(rev.oldAmount)} → ${formatAmount(rev.newAmount)}`;
+
+      const reason = document.createElement('div');
+      reason.className = 'revision-reason';
+      reason.textContent = rev.reason || '(no reason recorded)';
+
+      item.appendChild(header);
+      item.appendChild(reason);
+
+      if (rev.updatedBy || rev.transactionHash) {
+        const meta = document.createElement('div');
+        meta.className = 'revision-meta';
+        const parts = [];
+        if (rev.updatedBy) parts.push(`by ${shortAddress(rev.updatedBy)}`);
+        if (rev.transactionHash) {
+          const txAnchor = document.createElement('a');
+          txAnchor.href = `${LEDGER_CONFIG.explorerBaseUrl}${rev.transactionHash}`;
+          txAnchor.target = '_blank';
+          txAnchor.rel = 'noopener noreferrer';
+          txAnchor.textContent = `block #${rev.blockNumber}`;
+          if (parts.length > 0) {
+            meta.textContent = parts.join(' · ') + ' · ';
+          }
+          meta.appendChild(txAnchor);
+        } else {
+          meta.textContent = parts.join(' · ');
+        }
+        item.appendChild(meta);
+      }
+
+      if (rev.referenceURI && isValidUrl(rev.referenceURI)) {
+        const refDiv = document.createElement('div');
+        refDiv.className = 'revision-meta';
+        const refLink = document.createElement('a');
+        refLink.href = getSafeProofUrl(rev.referenceURI);
+        refLink.target = '_blank';
+        refLink.rel = 'noopener noreferrer';
+        refLink.textContent = 'Supporting reference →';
+        refDiv.appendChild(refLink);
+        item.appendChild(refDiv);
+      }
+
+      timeline.appendChild(item);
+    });
+
+    detailCell.appendChild(timeline);
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'muted-text';
+    empty.textContent = 'No amount revisions recorded for this entry.';
+    detailCell.appendChild(empty);
+  }
+
+  detailRow.appendChild(detailCell);
+  return detailRow;
+}
+
+function createNotesCell(entry, rowEl) {
+  const notesCell = document.createElement('td');
+
+  if (!entry.revisions || entry.revisions.length === 0) {
+    const empty = document.createElement('span');
+    empty.className = 'muted-text';
+    empty.textContent = '—';
+    notesCell.appendChild(empty);
+    return notesCell;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'note-wrap';
+
+  const latestRevision = entry.revisions[entry.revisions.length - 1];
+  const noteText = latestRevision.reason || '';
+
+  if (noteText) {
+    const preview = document.createElement('span');
+    preview.className = 'note-preview';
+    preview.textContent = noteText;
+    preview.title = noteText;
+    wrap.appendChild(preview);
+  }
+
+  const revCount = entry.revisions.length;
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'note-expand-btn';
+  const revLabel = `${revCount} revision${revCount === 1 ? '' : 's'}`;
+
+  function applyExpanded(expanded) {
+    toggleBtn.textContent = expanded ? '▲' : '▼';
+    toggleBtn.setAttribute('aria-expanded', String(expanded));
+    if (expanded) {
+      toggleBtn.setAttribute('aria-label', 'Collapse revision history');
+      toggleBtn.title = 'Collapse revision history';
+    } else {
+      toggleBtn.setAttribute('aria-label', `Show ${revLabel}`);
+      toggleBtn.title = `${revLabel} — click to expand`;
+    }
+  }
+
+  applyExpanded(expandedEntries.has(entry.id));
+
+  toggleBtn.addEventListener('click', () => {
+    const nowExpanded = expandedEntries.has(entry.id);
+    if (nowExpanded) {
+      expandedEntries.delete(entry.id);
+      applyExpanded(false);
+      const next = rowEl.nextElementSibling;
+      if (next && next.classList.contains('detail-row') && next.dataset.entryId === String(entry.id)) {
+        next.remove();
+      }
+    } else {
+      expandedEntries.add(entry.id);
+      applyExpanded(true);
+      rowEl.insertAdjacentElement('afterend', createRevisionDetailRow(entry));
+    }
+  });
+
+  wrap.appendChild(toggleBtn);
+  notesCell.appendChild(wrap);
+  return notesCell;
+}
+
 function setActionButtonEnabled(button, enabled) {
   button.disabled = !enabled;
   if (!enabled) {
@@ -939,7 +1090,7 @@ function createActionsCell(entry) {
 }
 
 function renderStateRow(message) {
-  ledgerBody.innerHTML = `<tr><td colspan="9">${message}</td></tr>`;
+  ledgerBody.innerHTML = `<tr><td colspan="10">${message}</td></tr>`;
 }
 
 function renderTable() {
@@ -983,10 +1134,16 @@ function renderTable() {
       row.appendChild(cell);
     });
 
+    row.appendChild(createNotesCell(entry, row));
     row.appendChild(createProofCell(entry));
     row.appendChild(createActionsCell(entry));
 
     ledgerBody.appendChild(row);
+
+    // Re-insert detail row for previously expanded entries after a re-render.
+    if (expandedEntries.has(entry.id) && entry.revisions && entry.revisions.length > 0) {
+      ledgerBody.appendChild(createRevisionDetailRow(entry));
+    }
   });
 }
 
@@ -1122,8 +1279,48 @@ async function fetchEntriesFromContract() {
     loaded.push(...page);
   }
 
+  // Fetch all AmountUpdated events in a single batch and attach revision history to entries.
+  const revisionsMap = await fetchAmountUpdatedEvents(contract);
+  for (const entry of loaded) {
+    const revisions = revisionsMap.get(entry.id) || [];
+    entry.revisions = revisions;
+    entry.latestNote = revisions.length > 0 ? revisions[revisions.length - 1].reason : '';
+  }
+
   loaded.sort((a, b) => b.id - a.id);
   return loaded;
+}
+
+// Queries all AmountUpdated events from the contract and returns a Map keyed by entry ID.
+// Each value is an array of revision objects ordered by block number (oldest first).
+// Errors are caught and logged so that a failed event query never blocks the main ledger load.
+async function fetchAmountUpdatedEvents(contract) {
+  try {
+    const filter = contract.filters.AmountUpdated();
+    const logs = await contract.queryFilter(filter);
+    const map = new Map();
+    for (const log of logs) {
+      const id = toNumeric(log.args.id);
+      if (!map.has(id)) map.set(id, []);
+      map.get(id).push({
+        oldAmount: toNumeric(log.args.oldAmount),
+        newAmount: toNumeric(log.args.newAmount),
+        reason: String(log.args.reason || ''),
+        referenceURI: String(log.args.referenceURI || ''),
+        updatedBy: String(log.args.updatedBy || ''),
+        blockNumber: log.blockNumber,
+        transactionHash: log.transactionHash || '',
+      });
+    }
+    // Ensure revisions within each entry are ordered oldest → newest by block.
+    for (const [, revisions] of map) {
+      revisions.sort((a, b) => a.blockNumber - b.blockNumber);
+    }
+    return map;
+  } catch (error) {
+    console.warn('Unable to fetch AmountUpdated events; revision notes will be unavailable.', error);
+    return new Map();
+  }
 }
 
 function isTargetNetwork(chainId) {
