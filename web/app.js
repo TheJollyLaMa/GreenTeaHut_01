@@ -217,6 +217,7 @@ const payoutSyncLedgerBtnEl = document.getElementById('payout-sync-ledger-btn');
 const payoutReviewStatusEl = document.getElementById('payout-review-status');
 const payoutBodyEl = document.getElementById('payout-body');
 const payoutEventsBodyEl = document.getElementById('payout-events-body');
+const ledgerContractLinkEl = document.getElementById('ledger-contract-link');
 
 const fieldErrorNames = ['type', 'amount', 'category', 'description', 'reference'];
 
@@ -308,6 +309,11 @@ function toNumeric(value) {
 function shortAddress(address) {
   if (!address || address.length < 10) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function formatLedgerHeadingAddress(address) {
+  if (!address || address.length < 8) return address;
+  return `${address.slice(0, 4)} 🧾🧾🧾🧾 ${address.slice(-4)}`;
 }
 
 function normalizeWallet(address) {
@@ -586,6 +592,26 @@ function updateWalletPanel() {
     walletConnectBtnEl.hidden = Boolean(currentAccount);
     walletConnectBtnEl.textContent = hasProvider ? 'Connect MetaMask' : 'Install MetaMask';
   }
+}
+
+function renderLedgerContractHeadingLink() {
+  if (!ledgerContractLinkEl) return;
+  const addr = LEDGER_CONFIG.contractAddress;
+  if (!isWalletAddress(addr)) {
+    ledgerContractLinkEl.hidden = true;
+    return;
+  }
+
+  ledgerContractLinkEl.hidden = false;
+  ledgerContractLinkEl.href = `${LEDGER_CONFIG.explorerAddressBaseUrl}${addr}`;
+  ledgerContractLinkEl.textContent = formatLedgerHeadingAddress(addr);
+  ledgerContractLinkEl.title = `${addr} (click to open on OptimismScan; copied to clipboard when allowed)`;
+  ledgerContractLinkEl.setAttribute('aria-label', `View ProjectLedger contract on OptimismScan: ${addr}`);
+  ledgerContractLinkEl.onclick = () => {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(addr).catch(() => {});
+    }
+  };
 }
 
 function setFieldError(fieldName, message) {
@@ -2233,6 +2259,8 @@ async function init() {
   if (payoutReviewFormEl) {
     payoutReviewFormEl.addEventListener('submit', handlePayoutReviewSubmit);
   }
+
+  renderLedgerContractHeadingLink();
 
   // Set Ledger as the default active view on load
   setActiveView('ledger');

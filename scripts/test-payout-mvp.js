@@ -63,5 +63,12 @@ assert(readmeSource.includes('no contract or ABI changes are required'), 'README
 assert(readmeSource.includes('COMMITTED` (approved, awaiting transfer)'), 'README documents COMMITTED as approved and awaiting transfer');
 assert(readmeSource.includes('CONFIRMED` (transfer completed + proof attached)'), 'README documents CONFIRMED as transfer completed with proof');
 
+console.log('\n=== 6. Public Ledger heading includes linked contract address ===');
+assert(htmlSource.includes('id="ledger-contract-link"'), 'Public Ledger heading includes the contract link placeholder');
+assert(appSource.includes('function formatLedgerHeadingAddress(address)'), 'Heading short-address formatter exists');
+assert(appSource.includes('🧾🧾🧾🧾'), 'Heading short-address formatter includes four glyphs');
+assert(appSource.includes('LEDGER_CONFIG.explorerAddressBaseUrl'), 'Heading link uses existing configured explorer address base URL');
+assert(appSource.includes('renderLedgerContractHeadingLink();'), 'Heading contract link is rendered during app initialization');
+
 console.log(`\nResult: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
