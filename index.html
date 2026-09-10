@@ -226,7 +226,7 @@
             and milestone progress for the Green Tea Hut build.
           </p>
           <div class="actions">
-            <a class="button button-primary" href="web/" data-app-link>Open the public ledger app</a>
+            <a class="button button-primary" href="web/">Open the public ledger app</a>
             <a
               class="button button-secondary"
               href="https://github.com/TheJollyLaMa/GreenTeaHut_01"
@@ -274,17 +274,9 @@
       </section>
 
       <p class="footer">
-        Looking for the live interface? Use <a href="web/" data-app-link>./web/</a> to open the existing
+        Looking for the live interface? Use <a href="web/">./web/</a> to open the existing
         Green Tea Hut #1 public ledger DApp.
       </p>
     </main>
-    <script>
-      const landingBaseUrl = new URL('./', document.baseURI);
-      const appEntryUrl = new URL('web/', landingBaseUrl);
-
-      document.querySelectorAll('[data-app-link]').forEach((link) => {
-        link.href = appEntryUrl.href;
-      });
-    </script>
   </body>
 </html>
