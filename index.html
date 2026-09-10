@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Green Tea Hut #1 — Public Ledger DApp</title>
+    <meta
+      name="description"
+      content="Green Tea Hut #1 public ledger DApp for transparent project funding, spending, and milestone tracking."
+    />
+    <meta name="theme-color" content="#175f3b" />
+    <meta property="og:title" content="Green Tea Hut #1 — Public Ledger DApp" />
+    <meta
+      property="og:description"
+      content="Open the public ledger DApp to review transparent funding, spending, and milestone progress for Green Tea Hut #1."
+    />
+    <meta property="og:type" content="website" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' role='img' aria-label='Tea cup favicon' viewBox='0 0 100 100'%3E%3Ctitle%3ETea cup favicon%3C/title%3E%3Ctext y='.9em' font-size='90'%3E🍵%3C/text%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #fef9e7;
+        --card: #ffffff;
+        --text: #1f2933;
+        --muted: #52606d;
+        --line: #d4d8dd;
+        --accent: #175f3b;
+        --accent-strong: #0f4d2f;
+        --shadow: 0 16px 40px rgba(23, 95, 59, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Arial, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top, rgba(16, 185, 129, 0.14), transparent 35%),
+          var(--bg);
+      }
+
+      .page {
+        width: min(72rem, calc(100% - 2rem));
+        margin: 0 auto;
+        padding: 2rem 0 3rem;
+      }
+
+      .hero {
+        display: grid;
+        gap: 1.5rem;
+        align-items: center;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        display: inline-block;
+        margin: 0 0 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 3.4rem);
+        line-height: 1.1;
+      }
+
+      .lead {
+        margin: 1rem 0 0;
+        font-size: 1.05rem;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.75rem;
+        padding: 0.75rem 1.1rem;
+        border-radius: 999px;
+        border: 1px solid var(--accent);
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .button-primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .button-primary:hover,
+      .button-primary:focus-visible {
+        background: var(--accent-strong);
+      }
+
+      .button-secondary {
+        background: #fff;
+        color: var(--accent);
+      }
+
+      .button-secondary:hover,
+      .button-secondary:focus-visible {
+        background: #f5f7f7;
+      }
+
+      .button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid rgba(23, 95, 59, 0.35);
+        outline-offset: 3px;
+      }
+
+      .hero-art {
+        width: min(100%, 22rem);
+        display: block;
+        margin: 0 auto;
+      }
+
+      .grid {
+        display: grid;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .grid h2 {
+        margin-top: 0;
+        font-size: 1.1rem;
+      }
+
+      .grid p,
+      .grid li {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      ul {
+        margin: 0.75rem 0 0;
+        padding-left: 1.2rem;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+      }
+
+      .pill {
+        padding: 0.5rem 0.8rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        font-size: 0.95rem;
+      }
+
+      .footer {
+        margin-top: 1rem;
+        font-size: 0.95rem;
+        color: var(--muted);
+      }
+
+      @media (min-width: 860px) {
+        .hero {
+          grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.9fr);
+        }
+
+        .grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero card" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Public ledger DApp</p>
+          <h1 id="page-title">Green Tea Hut #1</h1>
+          <p class="lead">
+            A transparent public accountability ledger for tracking project funding, spending,
+            and milestone progress for the Green Tea Hut build.
+          </p>
+          <div class="actions">
+            <a class="button button-primary" href="./web/">Open the public ledger app</a>
+            <a class="button button-secondary" href="./README.md">Read project overview</a>
+          </div>
+          <div class="meta" aria-label="Deployment details">
+            <span class="pill">Network: Optimism</span>
+            <span class="pill">Contract: ProjectLedger</span>
+            <span class="pill">Static root entry for IPFS/hosting</span>
+          </div>
+        </div>
+        <div>
+          <img
+            class="hero-art"
+            src="./web/assets/images/green-tea-party-hut.png"
+            alt="Concept art for the Green Tea Hut #1 project"
+            width="352"
+            height="352"
+          />
+        </div>
+      </section>
+
+      <section class="grid" aria-label="Application highlights">
+        <article class="card">
+          <h2>What you can review</h2>
+          <ul>
+            <li>Incoming and outgoing ledger entries</li>
+            <li>Pending, requested, committed, and confirmed states</li>
+            <li>Proof links and public spending notes</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h2>Why this page exists</h2>
+          <p>
+            This root document provides a proper default entry point for static hosting and IPFS
+            resolution while preserving the existing DApp under <code>/web/</code>.
+          </p>
+        </article>
+        <article class="card">
+          <h2>Quick access</h2>
+          <p>
+            Open the ledger app above to use the existing interface, or visit the project
+            repository documentation for contract and transparency details.
+          </p>
+        </article>
+      </section>
+
+      <p class="footer">
+        Looking for the live interface? Use <a href="./web/">./web/</a> to open the existing
+        Green Tea Hut #1 public ledger DApp.
+      </p>
+    </main>
+  </body>
+</html>
