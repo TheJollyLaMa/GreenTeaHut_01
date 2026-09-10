@@ -279,7 +279,7 @@
       </p>
     </main>
     <script>
-      const landingBaseUrl = new URL('./', window.location.href);
+      const landingBaseUrl = new URL('./', document.baseURI);
       const appEntryUrl = new URL('web/', landingBaseUrl);
 
       document.querySelectorAll('[data-app-link]').forEach((link) => {
