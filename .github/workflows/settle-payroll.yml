@@ -1,0 +1,61 @@
+name: Settle Payroll
+
+on:
+  workflow_dispatch:
+    inputs:
+      contributor_github:
+        description: Contributor GitHub username; blank matches all pending entries
+        required: false
+        type: string
+      issue_ref:
+        description: Issue ref to settle, for example owner/repo#123
+        required: false
+        type: string
+      tx_hash:
+        description: Optional on-chain transaction hash
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: green-tea-hut-payroll-queue
+      cancel-in-progress: false
+    steps:
+      - name: Checkout main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global credential.helper store
+          printf 'https://x-access-token:%s@github.com\n' "$GH_TOKEN" > "$HOME/.git-credentials"
+          chmod 600 "$HOME/.git-credentials"
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin main
+          git checkout -B main FETCH_HEAD
+
+      - name: Move pending entries to settled
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_CONTRIBUTOR_GITHUB: ${{ github.event.inputs.contributor_github }}
+          INPUT_ISSUE_REF: ${{ github.event.inputs.issue_ref }}
+          INPUT_TX_HASH: ${{ github.event.inputs.tx_hash }}
+        run: node scripts/settlePayroll.js
+
+      - name: Validate updated queue
+        run: node scripts/validatePayrollQueue.js
+
+      - name: Commit queue update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add payroll-queue.json contributor-accounts.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: settle ART payroll entries"
+          git pull --rebase origin main
+          git push origin HEAD:main

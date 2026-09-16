@@ -10,6 +10,17 @@ Project funding and spending are tracked alongside milestone progress and displa
 - Campaign page: https://artizen.fund/index/p/green-tea-hut-1?season=7
 - Public ledger (GitHub Pages): https://thejollylama.github.io/GreenTeaHut_01/web/
 
+### Contributor Payroll
+
+Merged pull requests can queue ART bounties from linked issues labeled `bounty: <amount> ART`. An optional `idea-credit: @username` label splits the bounty 80% to the implementer and 20% to the idea originator. Testing issues use `test-bounty: <amount> ART`, `/test-complete`, and owner-only `/test-approved` commands.
+
+Only wallets in `contributor-accounts.json` can receive entries. GitHub Actions update `payroll-queue.json`; an administrator then verifies payment and runs the **Settle Payroll** workflow. This settlement records ledger state and an optional transaction hash. It does not transfer ART or write to `ProjectLedger`.
+
+```sh
+node --test test/payroll.test.js test/commentArt.test.js
+node scripts/validatePayrollQueue.js
+```
+
 ### Contract Deployment
 - **Contract:** `ProjectLedger` (`contracts/ProjectLedger.sol`)
 - **Address:** `0x44500FFd99B621620f393FCdbcF55D5137A55A23`
