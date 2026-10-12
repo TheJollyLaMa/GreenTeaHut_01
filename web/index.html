@@ -338,6 +338,30 @@
         </div>
       </section>
 
+      <section class="payout-section" aria-label="Repository development payroll">
+        <h3 class="payout-subheading">Repository development payroll</h3>
+        <p class="payout-copy">Repo development and testing rewards use native USDC on Base, paid from this project's treasury. They are separate from the browser-local on-site labor records below.</p>
+        <p class="payout-copy">Only registered contributors are eligible. A queued bounty is not a funded guarantee. The owner or an approved treasury manager must review and sign each payment.</p>
+        <p id="repo-payroll-balance" class="payout-copy">USDC treasury balance unavailable.</p>
+        <button id="repo-payroll-connect" type="button" class="entry-submit">Connect payroll wallet</button>
+        <button id="repo-payroll-refresh" type="button" class="entry-submit">Refresh repo payroll</button>
+        <p id="repo-payroll-status" class="payout-status" role="status" aria-live="polite">Loading repo payroll...</p>
+        <div class="table-wrap">
+          <table class="payout-table">
+            <thead><tr><th>Contributor / wallet</th><th>Issue / role</th><th>USDC amount</th><th>Payment / settlement</th></tr></thead>
+            <tbody id="repo-payroll-body"></tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table class="payout-table">
+            <thead><tr><th>Registered contributor</th><th>Pending USDC</th><th>Settled USDC</th></tr></thead>
+            <tbody id="repo-payroll-accounts"></tbody>
+          </table>
+        </div>
+        <p class="payout-copy">After a payment is finalized, run <a href="https://github.com/TheJollyLaMa/GreenTeaHut_01/actions/workflows/settle-payroll.yml" target="_blank" rel="noopener noreferrer">Settle Payroll</a> with the contributor, issue, role, and payout hash shown here. GitHub independently verifies the exact USDC transfer before marking it settled.</p>
+        <p class="payout-copy">This treasury does not enforce payroll-reference uniqueness on-chain. The panel checks payment history and serializes payments in this browser, but coordinate across managers and devices; concurrent payments from other clients can still duplicate a reward.</p>
+      </section>
+
       <section class="payout-section payout-grid" aria-label="QR clock controls">
         <div class="payout-card">
           <h3 class="payout-subheading">🪪 QR issuance</h3>
@@ -506,6 +530,8 @@
     </div><!-- #payout-view -->
 
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+    <script src="payroll-core.js"></script>
+    <script src="repo-payroll.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

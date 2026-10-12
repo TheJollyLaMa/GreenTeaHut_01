@@ -6,6 +6,7 @@ const ABOUT_SLIDES_EMBED_URL =
 // --- Right toolbar (centralized view state) ---
 // activeView: 'wallet' | 'ledger' | 'payout'
 let activeView = 'ledger';
+let repoPayrollPanel = null;
 
 const toolbarWalletBtn = document.getElementById('toolbar-wallet');
 const toolbarScrollBtn = document.getElementById('toolbar-scroll');
@@ -52,6 +53,7 @@ function setActiveView(view) {
   if (view === 'payout') {
     startPayoutClock();
     renderPayoutView();
+    if (repoPayrollPanel) repoPayrollPanel.refresh().catch(error => console.error('Repo payroll refresh failed:', error));
   } else {
     stopPayoutClock();
   }
@@ -2531,15 +2533,25 @@ async function init() {
 
   renderLedgerContractHeadingLink();
 
-  // Set Ledger as the default active view on load
-  setActiveView('ledger');
+  setActiveView(activeView);
 
   bindWalletEvents();
   syncPayoutWalletDefaults();
   renderPayoutView();
   hydratePayoutReviewForm();
-  await refreshWalletState();
-  await refreshLedger();
+  if (window.GreenTeaRepoPayroll && window.GreenTeaPayroll) {
+    repoPayrollPanel = window.GreenTeaRepoPayroll.mount({
+      deploymentReady: () => deploymentVerified,
+      connectWallet,
+    });
+  } else {
+    document.getElementById('repo-payroll-status').textContent = 'Repo payroll scripts failed to load. Refresh before attempting payment.';
+  }
+  await Promise.all([
+    refreshWalletState(),
+    refreshLedger(),
+    repoPayrollPanel ? repoPayrollPanel.refresh() : Promise.resolve(),
+  ]);
 }
 
 init();

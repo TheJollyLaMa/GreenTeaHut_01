@@ -7,8 +7,29 @@ Project funding and spending are tracked alongside milestone progress and displa
 ### 🌐 Live Frontend
 **[https://thejollylama.github.io/GreenTeaHut_01/web/](https://thejollylama.github.io/GreenTeaHut_01/web/)**
 
-- Campaign page: https://artizen.fund/index/p/green-tea-hut-1?season=7
+- Fund the Base treasury: https://thejollylama.github.io/GreenTeaHut_01/web/treasury.html
 - Public ledger (GitHub Pages): https://thejollylama.github.io/GreenTeaHut_01/web/
+
+### Contributor Payroll
+
+Repo development payroll uses **native USDC on Base**, funded by Green Tea Hut's
+own project treasury, not ART, Artizen, or the shared payroll router. In the
+**Labor & Services Payout** tab, the **Repository development payroll** section
+shows the public queue, contributor totals, actual USDC funds, and authorized
+wallet payment controls. Existing on-site labor records remain a separate flow.
+
+Merged PRs queue rewards from local issues labeled `bounty: <amount> USDC`.
+`idea-credit: @username` splits rewards 80/20; both contributors must be registered.
+Testing uses `test-bounty: <amount> USDC`, `/test-complete`, and owner-only
+`/test-approved`. Multiple USDC labels and amounts over six decimals are rejected.
+Splits must be exact at six decimals; no rounding or floating-point accounting.
+
+Only wallets in `contributor-accounts.json` are eligible. The owner or an
+approved treasury manager signs each payout in the panel. **Settle Payroll**
+requires the contributor, local issue reference, exact role, and finalized
+Base transaction hash. It checks both the treasury payout event and USDC
+transfer for the exact wallet, amount, and deterministic work reference.
+Settlement does not send money. See [the payroll guide](docs/payroll.md).
 
 ### Active contract deployment
 - **Contract:** `ProjectTreasuryLedger` (`contracts/ProjectTreasuryLedger.sol`)

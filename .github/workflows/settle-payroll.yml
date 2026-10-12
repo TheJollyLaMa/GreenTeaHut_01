@@ -1,0 +1,61 @@
+name: Settle Payroll
+
+on:
+  workflow_dispatch:
+    inputs:
+      contributor_github:
+        description: Registered contributor GitHub username
+        required: true
+        type: string
+      issue_ref:
+        description: Issue ref to settle, for example TheJollyLaMa/GreenTeaHut_01#123
+        required: true
+        type: string
+      role:
+        description: Exact payroll role to settle
+        required: true
+        type: choice
+        options: [contributor, implementer, idea-originator, tester]
+      tx_hash:
+        description: Finalized Base treasury USDC payout hash
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: green-tea-hut-payroll-queue
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Verify payment and settle one queue entry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_CONTRIBUTOR_GITHUB: ${{ github.event.inputs.contributor_github }}
+          INPUT_ISSUE_REF: ${{ github.event.inputs.issue_ref }}
+          INPUT_ROLE: ${{ github.event.inputs.role }}
+          INPUT_TX_HASH: ${{ github.event.inputs.tx_hash }}
+        run: node scripts/settlePayroll.js
+      - name: Validate updated queue
+        run: node scripts/validatePayrollQueue.js
+      - name: Commit queue update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add payroll-queue.json contributor-accounts.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: settle verified Base USDC payroll"
+          git push origin HEAD:main

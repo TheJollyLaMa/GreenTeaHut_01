@@ -1,0 +1,50 @@
+name: Validate Payroll Queue
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - payroll-queue.json
+      - contributor-accounts.json
+      - payroll-assets.json
+      - package*.json
+      - web/payroll-core.js
+      - web/repo-payroll.js
+      - scripts/**
+      - test/**
+      - .github/workflows/**
+  pull_request:
+    branches: [main]
+    paths:
+      - payroll-queue.json
+      - contributor-accounts.json
+      - payroll-assets.json
+      - package*.json
+      - web/payroll-core.js
+      - web/repo-payroll.js
+      - scripts/**
+      - test/**
+      - .github/workflows/**
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: green-tea-hut-payroll-validation-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      - name: Validate payroll queue
+        run: node scripts/validatePayrollQueue.js
+
+      - name: Test payroll automation
+        run: node --test test/payroll.test.js test/commentArt.test.js test/payroll-payment.test.js test/repo-payroll.test.js test/payroll-integration.test.js

@@ -1,0 +1,30 @@
+name: Contributor Request Alert
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  notify-owner:
+    if: contains(github.event.issue.labels.*.name, 'contributor-request') || startsWith(github.event.issue.title, 'Contributor request:')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: contributor-request-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout main
+        run: |
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin main
+          git checkout --detach FETCH_HEAD
+
+      - name: Assign and notify repository owner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONTRIBUTOR_REQUEST_REVIEWER: TheJollyLaMa
+        run: node scripts/notifyContributorRequest.js

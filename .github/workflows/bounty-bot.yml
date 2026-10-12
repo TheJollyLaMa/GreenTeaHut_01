@@ -1,0 +1,50 @@
+name: Bounty Bot
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Merged PR number to recover
+        required: true
+        type: string
+      issue_number:
+        description: Optional comma-separated local issue numbers for manual recovery
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+
+jobs:
+  queue-bounty:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    concurrency:
+      group: green-tea-hut-payroll-queue
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Queue merged PR payout
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number }}
+          INPUT_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
+        run: node scripts/processMergedBounty.js
+      - name: Validate updated queue
+        run: node scripts/validatePayrollQueue.js
+      - name: Commit queue update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add payroll-queue.json contributor-accounts.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: queue Base USDC payroll entries"
+          git push origin HEAD:main
