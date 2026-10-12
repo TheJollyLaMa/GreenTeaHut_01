@@ -7,8 +7,8 @@
 The main project page now uses Base; Optimism is historical provenance only.
 Sourcify verified an exact creation/runtime source match:
 https://repo.sourcify.dev/8453/0x757B1F856f2Faea5a661820f9da56af032B1F9a1
-BaseScan verification is separate; its submission still requires a human
-Cloudflare check. Do not confuse Sourcify verification with a BaseScan badge.
+BaseScan also displays verified source:
+https://basescan.org/address/0x757B1F856f2Faea5a661820f9da56af032B1F9a1#code
 
 The public pages read Base through `https://base-rpc.publicnode.com` to avoid
 the official public endpoint's rate limits. Activation uses
