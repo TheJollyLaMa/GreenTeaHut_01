@@ -6,12 +6,20 @@
   'use strict';
 
   const REPOSITORY = 'TheJollyLaMa/GreenTeaHut_01';
-  const TREASURY = '0x757B1F856f2Faea5a661820f9da56af032B1F9a1';
+  const TREASURY = '0xf75d1688D01fE29235B3bde450B615e4f3d2254A';
+  const DEPLOYMENT_BLOCK = 52513179;
+  // Retired V1 Base treasury; never a valid payroll recipient.
+  const PREVIOUS_TREASURY = '0x757B1F856f2Faea5a661820f9da56af032B1F9a1';
   const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-  const ROLES = new Set(['contributor', 'implementer', 'idea-originator', 'tester']);
+  // Order matches the role enum index accepted by ProjectTreasuryV2.payPayroll.
+  const ROLE_LIST = ['contributor', 'implementer', 'idea-originator', 'tester'];
+  const ROLES = new Set(ROLE_LIST);
   const PAYMENT_ABI = [
-    'event FundsPaid(uint256 indexed transferId,address indexed asset,address indexed recipient,address authorizedBy,uint256 amount,string referenceURI)',
-    'function payToken(address asset,address recipient,uint256 amount,string referenceURI)',
+    'event FundsPaid(uint256 indexed transferId,address indexed asset,address indexed recipient,address manager,uint256 amount,string referenceURI)',
+    'event PayrollPaid(bytes32 indexed workReference,address indexed recipient,uint256 amountUSDC,address manager)',
+    'function payPayroll(uint256 issueId,string contributorGithub,uint8 role,address recipient,uint256 amountUSDC)',
+    'function paidPayrollReferences(bytes32) view returns (bool)',
+    'function availableUSDC() view returns (uint256)',
     'function owner() view returns (address)',
     'function managers(address) view returns (bool)',
   ];
@@ -39,7 +47,8 @@
 
   function validAddress(value) {
     return typeof value === 'string' && /^0x[a-fA-F0-9]{40}$/.test(value) &&
-      !/^0x0{40}$/i.test(value) && value.toLowerCase() !== TREASURY.toLowerCase();
+      !/^0x0{40}$/i.test(value) && value.toLowerCase() !== TREASURY.toLowerCase() &&
+      value.toLowerCase() !== PREVIOUS_TREASURY.toLowerCase();
   }
 
   function validateConfig(config) {
@@ -47,14 +56,14 @@
         config.treasuryAddress?.toLowerCase() !== TREASURY.toLowerCase() ||
         config.assets?.USDC?.address?.toLowerCase() !== USDC.toLowerCase() ||
         config.assets.USDC.decimals !== 6 || Object.keys(config.assets).length !== 1 ||
-        config.deploymentBlock !== 52508544 || !/^https:\/\//.test(config.rpcUrl)) {
+        config.deploymentBlock !== DEPLOYMENT_BLOCK || !/^https:\/\//.test(config.rpcUrl)) {
       throw new Error('Payroll must use the activated Green Tea Hut treasury and native Base USDC');
     }
   }
 
   function entryKey(entry) {
     if (!new RegExp(`^${REPOSITORY.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}#[1-9]\\d*$`).test(entry.issueRef) ||
-        !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(entry.contributorGithub || '') ||
+        !/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(entry.contributorGithub || '') ||
         !ROLES.has(entry.role || 'contributor') || entry.currency !== 'USDC') {
       throw new Error('Invalid repository, contributor, role, or payroll currency');
     }
@@ -63,6 +72,22 @@
 
   function paymentReference(entry) {
     return `repo-payroll:${entryKey(entry)}`;
+  }
+
+  // Arguments for payPayroll; the contract rebuilds the same reference on-chain and rejects reuse.
+  function payrollCall(entry) {
+    entryKey(entry);
+    return {
+      issueId: BigInt(entry.issueRef.slice(entry.issueRef.lastIndexOf('#') + 1)),
+      contributorGithub: entry.contributorGithub.toLowerCase(),
+      role: ROLE_LIST.indexOf(entry.role || 'contributor'),
+      recipient: entry.contributor,
+      amount: amountUnits(entry.amount),
+    };
+  }
+
+  function workReference(entry, ethers) {
+    return ethers.keccak256(ethers.toUtf8Bytes(paymentReference(entry)));
   }
 
   function validateData(queue, accounts, config) {
@@ -127,6 +152,8 @@
     const payment = new ethers.Interface(PAYMENT_ABI);
     const token = new ethers.Interface(TOKEN_ABI);
     const paidTopic = payment.getEvent('FundsPaid').topicHash;
+    const payrollTopic = payment.getEvent('PayrollPaid').topicHash;
+    const work = workReference(entry, ethers);
     const transferTopic = token.getEvent('Transfer').topicHash;
     const paid = receipt.logs.filter(log => log.address.toLowerCase() === TREASURY.toLowerCase() &&
       log.topics[0] === paidTopic).filter(log => {
@@ -141,7 +168,15 @@
       return args.from.toLowerCase() === TREASURY.toLowerCase() &&
         args.to.toLowerCase() === entry.contributor.toLowerCase() && args.value === amount;
     });
-    if (paid.length !== 1 || transferred.length !== 1) throw new Error('No exact treasury USDC payout and token transfer proof');
+    const unique = receipt.logs.filter(log => log.address.toLowerCase() === TREASURY.toLowerCase() &&
+      log.topics[0] === payrollTopic).filter(log => {
+      const { args } = payment.parseLog(log);
+      return args.workReference === work && args.recipient.toLowerCase() === entry.contributor.toLowerCase() &&
+        args.amountUSDC === amount;
+    });
+    if (paid.length !== 1 || transferred.length !== 1 || unique.length !== 1) {
+      throw new Error('No exact treasury USDC payroll payout, unique work reference and token transfer proof');
+    }
     const paymentLogIndex = paid[0].index ?? paid[0].logIndex;
     if (!Number.isSafeInteger(paymentLogIndex) || paymentLogIndex < 0) throw new Error('Payment log index missing');
     return { txHash: receipt.hash, paymentLogIndex, paymentBlock: receipt.blockNumber };
@@ -161,6 +196,7 @@
     return proof;
   }
 
-  return { REPOSITORY, TREASURY, USDC, ROLES, PAYMENT_ABI, TOKEN_ABI, amountUnits, formatUnits,
-    validAddress, validateConfig, entryKey, paymentReference, validateData, verifyReceipt, verifyPayment };
+  return { REPOSITORY, TREASURY, DEPLOYMENT_BLOCK, PREVIOUS_TREASURY, USDC, ROLES, ROLE_LIST, PAYMENT_ABI, TOKEN_ABI,
+    amountUnits, formatUnits, validAddress, validateConfig, entryKey, paymentReference, payrollCall, workReference,
+    validateData, verifyReceipt, verifyPayment };
 }));

@@ -4,9 +4,10 @@ const ABOUT_SLIDES_EMBED_URL =
   'https://docs.google.com/presentation/d/e/2PACX-1vTraXc7uqbvK62XYUSvtLul29KxMW3zTluA_wCIhTNML52gSJgnkFy04m7tiECySan_rU-qwvwd8HqT/pubembed?start=true&loop=true&delayms=5000';
 
 // --- Right toolbar (centralized view state) ---
-// activeView: 'wallet' | 'ledger' | 'payout'
+// activeView: 'wallet' | 'ledger' | 'payout' | 'storefront'
 let activeView = 'ledger';
 let repoPayrollPanel = null;
+let storefrontPanel = null;
 
 const toolbarWalletBtn = document.getElementById('toolbar-wallet');
 const toolbarScrollBtn = document.getElementById('toolbar-scroll');
@@ -14,6 +15,8 @@ const toolbarPayoutBtn = document.getElementById('toolbar-payout');
 const walletView = document.getElementById('wallet-view');
 const ledgerView = document.getElementById('ledger-view');
 const payoutView = document.getElementById('payout-view');
+const toolbarStorefrontBtn = document.getElementById('toolbar-storefront');
+const storefrontView = document.getElementById('storefront-view');
 
 function setActiveView(view) {
   activeView = view;
@@ -22,6 +25,10 @@ function setActiveView(view) {
   if (toolbarWalletBtn) toolbarWalletBtn.setAttribute('aria-pressed', String(view === 'wallet'));
   if (toolbarScrollBtn) toolbarScrollBtn.setAttribute('aria-pressed', String(view === 'ledger'));
   if (toolbarPayoutBtn) toolbarPayoutBtn.setAttribute('aria-pressed', String(view === 'payout'));
+  if (toolbarStorefrontBtn) {
+    toolbarStorefrontBtn.setAttribute('aria-pressed', String(view === 'storefront'));
+    toolbarStorefrontBtn.setAttribute('aria-label', view === 'storefront' ? 'Greenhouse storefront (active)' : 'Open greenhouse storefront');
+  }
 
   // Update accessible labels to reflect current state
   if (toolbarWalletBtn) {
@@ -47,6 +54,8 @@ function setActiveView(view) {
   if (walletView) walletView.hidden = view !== 'wallet';
   if (ledgerView) ledgerView.hidden = view !== 'ledger';
   if (payoutView) payoutView.hidden = view !== 'payout';
+  if (storefrontView) storefrontView.hidden = view !== 'storefront';
+  if (view === 'storefront' && storefrontPanel) storefrontPanel.refresh();
 
   // Populate wallet panel when it becomes visible
   if (view === 'wallet') updateWalletPanel();
@@ -63,6 +72,7 @@ function setActiveView(view) {
 if (toolbarWalletBtn) toolbarWalletBtn.addEventListener('click', () => setActiveView('wallet'));
 if (toolbarScrollBtn) toolbarScrollBtn.addEventListener('click', () => setActiveView('ledger'));
 if (toolbarPayoutBtn) toolbarPayoutBtn.addEventListener('click', () => setActiveView('payout'));
+if (toolbarStorefrontBtn) toolbarStorefrontBtn.addEventListener('click', () => setActiveView('storefront'));
 
 const aboutModal = document.getElementById('about-modal');
 const aboutTrigger = document.getElementById('about-trigger');
@@ -127,18 +137,26 @@ if (aboutModal && aboutTrigger && modalClose) {
 }
 
 // --- Ledger (on-chain) ---
+// Each reviewed treasury version, with the chain and snapshot its imported history must match.
+const TREASURY_VERSIONS = {
+  1: { address: '0x757B1F856f2Faea5a661820f9da56af032B1F9a1', sourceChainId: 10, historyFile: 'optimism-history.json' },
+  2: { address: '0xf75d1688D01fE29235B3bde450B615e4f3d2254A', sourceChainId: 8453, historyFile: 'base-history.json' },
+};
 const LEDGER_CONFIG = {
-  contractAddress: '0x757B1F856f2Faea5a661820f9da56af032B1F9a1',
+  contractAddress: '0xf75d1688D01fE29235B3bde450B615e4f3d2254A',
   targetChainId: 8453,
   targetChainName: 'Base',
   explorerBaseUrl: 'https://basescan.org/tx/',
   explorerAddressBaseUrl: 'https://basescan.org/address/',
   rpcUrl: 'https://base-rpc.publicnode.com',
   entryPageSize: 20,
-  deploymentBlock: 52508544,
+  deploymentBlock: 52513179,
 };
 let deploymentVerified = false;
 let optimismHistory = null;
+let importedHistory = null;
+// Revisions recorded on the retired V1 Base treasury before its entries were imported into V2.
+let previousBaseEvents = [];
 
 const PROJECT_LEDGER_ABI = [
   // View — ledger reads
@@ -671,7 +689,7 @@ function normalizeEntry(entry) {
     category: entry.category || '',
     description: entry.description || '',
     reference: entry.referenceURI || '',
-    historical: optimismHistory !== null && BigInt(entry.id) <= BigInt(optimismHistory.count),
+    historical: importedHistory !== null && BigInt(entry.id) <= BigInt(importedHistory.count),
   };
 }
 
@@ -1351,6 +1369,21 @@ async function fetchAmountUpdatedEvents(contract) {
         blockNumber: sourceLog.blockNumber,
         transactionHash: sourceLog.transactionHash,
         explorerBaseUrl: 'https://optimistic.etherscan.io/tx/',
+      });
+    }
+    for (const sourceLog of previousBaseEvents) {
+      const log = contract.interface.parseLog(sourceLog);
+      if (!log || log.name !== 'AmountUpdated') continue;
+      const id = toNumeric(log.args.id);
+      if (!map.has(id)) map.set(id, []);
+      map.get(id).push({
+        oldAmount: toNumeric(log.args.oldAmount),
+        newAmount: toNumeric(log.args.newAmount),
+        reason: String(log.args.reason),
+        referenceURI: String(log.args.referenceURI),
+        updatedBy: String(log.args.updatedBy),
+        blockNumber: sourceLog.blockNumber,
+        transactionHash: sourceLog.transactionHash,
       });
     }
     // Ensure revisions within each entry are ordered oldest → newest by block.
@@ -2462,17 +2495,30 @@ function bindWalletEvents() {
 }
 
 async function init() {
+  if (window.GreenTeaStorefront) storefrontPanel = window.GreenTeaStorefront.mount({ connectWallet });
+  else document.getElementById('storefront-status').textContent = 'Storefront scripts failed to load. Refresh the page.';
+  const storefrontRefresh = storefrontPanel ? storefrontPanel.refresh() : Promise.resolve();
   try {
-    const responses = await Promise.all([
-      window.fetch('base-deployment.json', { cache: 'no-store' }),
-      window.fetch('optimism-history.json', { cache: 'no-store' }),
-    ]);
-    if (responses.some((response) => !response.ok)) throw new Error('Unable to load Base deployment or history snapshot');
-    const [deployment, history] = await Promise.all(responses.map((response) => response.json()));
-    if (!deployment.ready || deployment.chainId !== 8453 ||
-        deployment.address?.toLowerCase() !== LEDGER_CONFIG.contractAddress.toLowerCase()) throw new Error('Base deployment configuration is not activated');
-    optimismHistory = history;
+    const loadJson = async (file) => {
+      const response = await window.fetch(file, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Unable to load ${file}`);
+      return response.json();
+    };
+    const deployment = await loadJson('base-deployment.json');
+    const version = TREASURY_VERSIONS[deployment.version || 1];
+    if (!version || !deployment.ready || deployment.chainId !== 8453 ||
+        deployment.address?.toLowerCase() !== version.address.toLowerCase() ||
+        (deployment.historyFile || 'optimism-history.json') !== version.historyFile) throw new Error('Base deployment configuration is not activated');
+    LEDGER_CONFIG.contractAddress = version.address;
     LEDGER_CONFIG.deploymentBlock = deployment.deploymentBlock;
+    renderLedgerContractHeadingLink();
+    const [opHistory, history] = await Promise.all([loadJson('optimism-history.json'), loadJson(version.historyFile)]);
+    optimismHistory = opHistory;
+    if (history.sourceChainId === 8453) {
+      // The V1 snapshot must keep the original OP entries as its unaltered prefix.
+      if (history.predecessor?.historyHash !== opHistory.historyHash || history.count < opHistory.count) throw new Error('Base history snapshot does not preserve the OP history');
+      previousBaseEvents = history.events || [];
+    }
     const { contract, provider } = getReadContract();
     const [chain, finalized, importedHash, historyHash, count, sourceBlock, sourceBlockHash, sourceLedger, sourceChain] = await Promise.all([
       provider.send('eth_chainId', []), contract.migrationFinalized(), contract.importedHash(),
@@ -2482,9 +2528,11 @@ async function init() {
     if (Number(BigInt(chain)) !== 8453 || !finalized || importedHash !== history.historyHash ||
         historyHash !== history.historyHash || Number(count) !== history.count ||
         Number(sourceBlock) !== history.sourceBlock || sourceBlockHash !== history.sourceBlockHash ||
-        sourceLedger.toLowerCase() !== history.sourceAddress.toLowerCase() || Number(sourceChain) !== 10) {
+        sourceLedger.toLowerCase() !== history.sourceAddress.toLowerCase() ||
+        Number(sourceChain) !== version.sourceChainId || history.sourceChainId !== version.sourceChainId) {
       throw new Error('Base history commitment or network verification failed');
     }
+    importedHistory = history;
     deploymentVerified = true;
   } catch (error) {
     deploymentVerified = false;
@@ -2541,7 +2589,9 @@ async function init() {
   hydratePayoutReviewForm();
   if (window.GreenTeaRepoPayroll && window.GreenTeaPayroll) {
     repoPayrollPanel = window.GreenTeaRepoPayroll.mount({
-      deploymentReady: () => deploymentVerified,
+      // Payroll pays only through the treasury this page verified.
+      deploymentReady: () => deploymentVerified &&
+        LEDGER_CONFIG.contractAddress.toLowerCase() === window.GreenTeaPayroll.TREASURY.toLowerCase(),
       connectWallet,
     });
   } else {
@@ -2551,6 +2601,7 @@ async function init() {
     refreshWalletState(),
     refreshLedger(),
     repoPayrollPanel ? repoPayrollPanel.refresh() : Promise.resolve(),
+    storefrontRefresh,
   ]);
 }
 

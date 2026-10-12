@@ -7,6 +7,7 @@ on:
       - 'scripts/*treasury*'
       - 'scripts/*base*'
       - 'scripts/*snapshot*'
+      - 'scripts/compile-v2.js'
       - 'scripts/export-optimism.js'
       - 'test/**'
       - 'web/**'
@@ -37,6 +38,8 @@ jobs:
       - run: npm ci
       - run: npm run compile
       - run: git diff --exit-code -- artifacts/ProjectTreasuryLedger.json web/treasury-abi.json
+      - run: npm run compile:v2
+      - run: git diff --exit-code -- artifacts/ProjectTreasuryV2.json web/treasury-v2-abi.json
       - run: npm test
       - run: node scripts/test-native-decimals.js
       - run: node scripts/test-payout-mvp.js

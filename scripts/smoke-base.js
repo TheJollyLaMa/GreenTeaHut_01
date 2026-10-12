@@ -6,8 +6,9 @@ const { JsonRpcProvider, Wallet, Contract, Transaction, getAddress, keccak256, p
 const { loadKey } = require('./deploy-base');
 const { normalizeRuntime } = require('./activate-base');
 const { hashEntries, serializeEntry, validateSnapshot } = require('./ledger-snapshot');
+const { V1_ADDRESS, validateBaseSnapshot } = require('./base-snapshot');
 
-const ADDRESS = '0x757B1F856f2Faea5a661820f9da56af032B1F9a1';
+const ADDRESS = V1_ADDRESS;
 const AMOUNT = parseEther('0.000001');
 const PURPOSE = 'Green Tea Hut ETH receive/withdraw smoke test';
 const root = path.resolve(__dirname, '..');
@@ -27,9 +28,9 @@ const TOKEN_ABI = [
 class SmokeError extends Error {}
 let stage = 'loading local configuration';
 
-function verifyMovement(receipt, iface, name, owner, amount, asset = ZeroAddress, purpose = PURPOSE) {
+function verifyMovement(receipt, iface, name, owner, amount, asset = ZeroAddress, purpose = PURPOSE, treasury = ADDRESS) {
   const events = receipt.logs
-    .filter((log) => log.address.toLowerCase() === ADDRESS.toLowerCase())
+    .filter((log) => log.address.toLowerCase() === treasury.toLowerCase())
     .map((log) => iface.parseLog(log))
     .filter((event) => event?.name === name);
   if (receipt.status !== 1 || events.length !== 1) throw new SmokeError('Missing successful treasury movement receipt');
@@ -52,14 +53,22 @@ function verifyTokenTransfer(receipt, iface, from, to, amount) {
 }
 
 async function main() {
-  const flags = process.argv.slice(2);
-  if (new Set(flags).size !== flags.length || flags.some((flag) => !['--broadcast', '--usdc'].includes(flag))) throw new SmokeError('Usage: node scripts/smoke-base.js [--usdc] [--broadcast]');
+  const args = process.argv.slice(2);
+  const v2Index = args.indexOf('--v2');
+  const v2 = v2Index >= 0;
+  const target = v2 ? args[v2Index + 1] : ADDRESS;
+  const flags = v2 ? args.filter((_, index) => index !== v2Index && index !== v2Index + 1) : args;
+  if (new Set(flags).size !== flags.length || flags.some((flag) => !['--broadcast', '--usdc'].includes(flag)) ||
+      !/^0x[0-9a-fA-F]{40}$/.test(target || '') || (v2 && getAddress(target) === ADDRESS)) {
+    throw new SmokeError('Usage: node scripts/smoke-base.js [--v2 <V2-address>] [--usdc] [--broadcast]');
+  }
+  const TREASURY = getAddress(target);
   const broadcast = flags.includes('--broadcast');
   const usdc = flags.includes('--usdc');
   const asset = usdc ? USDC : ZeroAddress;
   const amount = usdc ? USDC_AMOUNT : AMOUNT;
   const purpose = usdc ? USDC_PURPOSE : PURPOSE;
-  const stateFile = path.join(root, usdc ? '.base-usdc-smoke-state.json' : '.base-smoke-state.json');
+  const stateFile = path.join(root, `.base-${v2 ? 'v2-' : ''}${usdc ? 'usdc-' : ''}smoke-state.json`);
   const envPath = path.join(root, '.env');
   if (!fs.existsSync(envPath) || (fs.statSync(envPath).mode & 0o077) !== 0) throw new SmokeError('Create the local .env and protect it with chmod 600 .env');
   process.loadEnvFile(envPath);
@@ -69,15 +78,19 @@ async function main() {
     if (Number((await provider.getNetwork()).chainId) !== 8453) throw new SmokeError('RPC is not Base mainnet');
     const wallet = new Wallet(loadKey(process.env.BASE_DEPLOYER_PRIVATE_KEY), provider);
     stage = 'checking deployed owner and runtime';
-    const artifact = require('../artifacts/ProjectTreasuryLedger.json');
-    const snapshot = validateSnapshot(require('../web/optimism-history.json'));
+    const artifact = require(v2 ? '../artifacts/ProjectTreasuryV2.json' : '../artifacts/ProjectTreasuryLedger.json');
+    const snapshot = v2 ? validateBaseSnapshot(require('../web/base-history.json'), require('../web/optimism-history.json'))
+      : validateSnapshot(require('../web/optimism-history.json'));
     const config = require('../web/base-deployment.json');
-    const ledger = new Contract(ADDRESS, artifact.abi, provider);
+    const ledger = new Contract(TREASURY, artifact.abi, provider);
     if (getAddress(wallet.address) !== getAddress(config.owner) ||
         getAddress(await ledger.owner()) !== getAddress(wallet.address)) throw new SmokeError('Local key must control the treasury owner');
     const runtime = artifact.evm.deployedBytecode;
-    if (normalizeRuntime(await provider.getCode(ADDRESS), runtime.immutableReferences) !==
+    if (normalizeRuntime(await provider.getCode(TREASURY), runtime.immutableReferences) !==
         normalizeRuntime(runtime.object, runtime.immutableReferences)) throw new SmokeError('Deployed bytecode mismatch');
+    if (v2 && (getAddress(await ledger.sourceLedger()) !== ADDRESS || await ledger.storeOpen() || await ledger.reservedUSDC() !== 0n)) {
+      throw new SmokeError('V2 predecessor, closed store or zero escrow precondition failed');
+    }
     if (!(await ledger.migrationFinalized()) || await ledger.historyHash() !== snapshot.historyHash ||
         await ledger.importedHash() !== snapshot.historyHash ||
         Number(await ledger.historicalEntries()) !== snapshot.count) throw new SmokeError('Migration verification failed');
@@ -89,7 +102,7 @@ async function main() {
     let allowance = 0n;
     const savedState = fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : null;
     if (savedState && (fs.statSync(stateFile).mode & 0o077) !== 0) throw new SmokeError('Protect the local smoke-test state with chmod 600 before resuming');
-    if (savedState && (savedState.chainId !== 8453 || savedState.address !== ADDRESS ||
+    if (savedState && (savedState.chainId !== 8453 || savedState.address !== TREASURY ||
         savedState.owner !== wallet.address || savedState.amountWei !== amount.toString() ||
         (savedState.asset || ZeroAddress) !== asset)) throw new SmokeError('Existing smoke-test state does not match; do not delete it or start a second deposit');
     if (usdc) {
@@ -98,21 +111,21 @@ async function main() {
       if (await provider.getCode(USDC) === '0x' || Number(await token.decimals()) !== 6 ||
           await token.symbol() !== 'USDC') throw new SmokeError('Native Base USDC contract verification failed');
       const tokenBalance = await token.balanceOf(wallet.address);
-      allowance = await token.allowance(wallet.address, ADDRESS);
+      allowance = await token.allowance(wallet.address, TREASURY);
       console.log(`Native Base USDC: ${USDC}; owner balance: ${formatUnits(tokenBalance, 6)} USDC.`);
       if (!savedState?.steps.deposit && tokenBalance < amount) throw new SmokeError('Owner wallet needs at least 0.01 native USDC on Base. No token purchase or bridge is performed.');
       if (!savedState && allowance !== 0n) throw new SmokeError('Existing USDC allowance is nonzero. Revoke it in your wallet before this exact-allowance test.');
     }
-    const treasuryBalance = (block = 'latest') => token ? token.balanceOf(ADDRESS, { blockTag: block }) : provider.getBalance(ADDRESS, block);
+    const treasuryBalance = (block = 'latest') => token ? token.balanceOf(TREASURY, { blockTag: block }) : provider.getBalance(TREASURY, block);
     const fees = await provider.getFeeData();
     stage = 'estimating test fees and deposit';
     if (fees.maxFeePerGas === null || fees.maxPriorityFeePerGas === null) throw new SmokeError('No EIP-1559 fee quote available');
     const requests = {
-      ...(usdc ? { approve: { to: USDC, value: 0n, data: token.interface.encodeFunctionData('approve', [ADDRESS, amount]) } } : {}),
-      deposit: { to: ADDRESS, value: usdc ? 0n : amount, data: usdc
+      ...(usdc ? { approve: { to: USDC, value: 0n, data: token.interface.encodeFunctionData('approve', [TREASURY, amount]) } } : {}),
+      deposit: { to: TREASURY, value: usdc ? 0n : amount, data: usdc
         ? ledger.interface.encodeFunctionData('depositToken', [USDC, amount, purpose])
         : ledger.interface.encodeFunctionData('depositETH', [purpose]) },
-      withdraw: { to: ADDRESS, value: 0n, data: usdc
+      withdraw: { to: TREASURY, value: 0n, data: usdc
         ? ledger.interface.encodeFunctionData('payToken', [USDC, wallet.address, amount, purpose])
         : ledger.interface.encodeFunctionData('payETH', [wallet.address, amount, purpose]) },
     };
@@ -121,7 +134,7 @@ async function main() {
     const cap = parseEther(process.env.BASE_DEPLOY_MAX_FEE_ETH || '0');
     if (cap <= 0n || executionCeiling > cap) throw new SmokeError('Smoke-test execution fee ceiling exceeds configured budget');
     const balance = await provider.getBalance(wallet.address);
-    console.log(`Base treasury: ${ADDRESS}; owner: ${wallet.address}`);
+    console.log(`Base treasury: ${TREASURY}; owner: ${wallet.address}`);
     console.log(`Test: deposit ${usdc ? '0.01 USDC' : '0.000001 ETH'}, then return exactly that amount to the owner.`);
     console.log(`${usdc ? 'Three' : 'Two'}-transaction execution fee ceiling: ${formatEther(executionCeiling)} ETH; L1 fees are additional.`);
     // Reserve extra funds for data fees; this is not a prediction of actual cost.
@@ -132,12 +145,12 @@ async function main() {
       console.log('Deposit gas estimation follows the exact-amount approval; the approval is not sent during preflight.');
     } else if (!savedState?.steps.deposit) await provider.estimateGas({ ...requests.deposit, from: wallet.address });
     if (!broadcast) {
-      console.log(`Dry run passed. Nothing signed or sent. Run npm run ${usdc ? 'smoke:base:usdc' : 'smoke:base'} for the real transactions.`);
+      console.log(`Dry run passed. Nothing signed or sent. Run the same command with --broadcast for the real transactions.`);
       return;
     }
     stage = 'loading resumable test state';
     const state = savedState || {
-      chainId: 8453, address: ADDRESS, owner: wallet.address, amountWei: amount.toString(), asset,
+      chainId: 8453, address: TREASURY, owner: wallet.address, amountWei: amount.toString(), asset,
       baselineWei: (await treasuryBalance()).toString(),
       ...(usdc ? { ownerBaselineUnits: (await token.balanceOf(wallet.address)).toString() } : {}), steps: {},
     };
@@ -174,11 +187,11 @@ async function main() {
         const approvals = receipt.logs.filter((log) => log.address.toLowerCase() === USDC.toLowerCase())
           .map((log) => token.interface.parseLog(log)).filter((event) => event?.name === 'Approval');
         if (approvals.length !== 1 || getAddress(approvals[0].args.owner) !== wallet.address ||
-            getAddress(approvals[0].args.spender) !== ADDRESS || approvals[0].args.value !== amount) throw new SmokeError('Exact USDC approval receipt mismatch');
+            getAddress(approvals[0].args.spender) !== TREASURY || approvals[0].args.value !== amount) throw new SmokeError('Exact USDC approval receipt mismatch');
       } else {
-        verifyMovement(receipt, ledger.interface, label === 'deposit' ? 'FundsReceived' : 'FundsPaid', wallet.address, amount, asset, purpose);
-        if (usdc) verifyTokenTransfer(receipt, token.interface, label === 'deposit' ? wallet.address : ADDRESS,
-          label === 'deposit' ? ADDRESS : wallet.address, amount);
+        verifyMovement(receipt, ledger.interface, label === 'deposit' ? 'FundsReceived' : 'FundsPaid', wallet.address, amount, asset, purpose, TREASURY);
+        if (usdc) verifyTokenTransfer(receipt, token.interface, label === 'deposit' ? wallet.address : TREASURY,
+          label === 'deposit' ? TREASURY : wallet.address, amount);
       }
       console.log(`${label} verified: https://basescan.org/tx/${saved.hash}`);
       return receipt;
@@ -186,7 +199,7 @@ async function main() {
 
     if (usdc) {
       await step('approve');
-      if (!state.steps.deposit && await token.allowance(wallet.address, ADDRESS) !== amount) throw new SmokeError('USDC allowance is not exactly the test amount; inspect before deposit');
+      if (!state.steps.deposit && await token.allowance(wallet.address, TREASURY) !== amount) throw new SmokeError('USDC allowance is not exactly the test amount; inspect before deposit');
     }
     const deposited = await step('deposit');
     if (!state.steps.withdraw && await treasuryBalance(deposited.blockNumber) !== BigInt(state.baselineWei) + amount) {
@@ -198,7 +211,7 @@ async function main() {
     if (after !== BigInt(state.baselineWei)) throw new SmokeError('Treasury balance did not return to its baseline; inspect concurrent activity');
     if (usdc) {
       if (await token.balanceOf(wallet.address, { blockTag: paid.blockNumber }) !== BigInt(state.ownerBaselineUnits)) throw new SmokeError('Owner USDC balance was not restored; inspect concurrent token activity');
-      if (await token.allowance(wallet.address, ADDRESS, { blockTag: paid.blockNumber }) !== 0n) throw new SmokeError('USDC allowance remains after deposit');
+      if (await token.allowance(wallet.address, TREASURY, { blockTag: paid.blockNumber }) !== 0n) throw new SmokeError('USDC allowance remains after deposit');
     } else {
       // Compare the owner's change against its exact total transaction fee, including Base data fees.
       const rawReceipt = await provider.send('eth_getTransactionReceipt', [paid.hash]);

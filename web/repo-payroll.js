@@ -39,17 +39,24 @@
     const [owner, manager] = await Promise.all([treasury.owner(), treasury.managers(address)]);
     if (address.toLowerCase() !== owner.toLowerCase() && !manager) throw new Error('Only the owner or an approved treasury manager can pay');
     const token = new ethers.Contract(core.USDC, core.TOKEN_ABI, reader);
-    const amount = core.amountUnits(entry.amount);
-    const [decimals, balance] = await Promise.all([token.decimals(), token.balanceOf(config.treasuryAddress)]);
+    const call = core.payrollCall(entry);
+    const work = core.workReference(entry, ethers);
+    const [decimals, available] = await Promise.all([token.decimals(), treasury.availableUSDC()]);
     if (Number(decimals) !== 6) throw new Error('Native Base USDC decimals verification failed');
-    if (balance < amount) throw new Error('Project treasury has insufficient USDC. Fund it first.');
-    await checkUnpaid();
-    const reference = core.paymentReference(entry);
-    if (!confirm(`Send ${entry.amount} USDC on Base from the project treasury to ${entry.contributor} (@${entry.contributorGithub}) for ${entry.issueRef}, role ${entry.role || 'contributor'}? This is a real, irreversible token transfer.`)) return null;
+    // Store escrow is reserved for buyers; payroll may only spend the unreserved USDC.
+    if (available < call.amount) throw new Error('Project treasury has insufficient unreserved USDC. Fund it first.');
+    const unpaidOnChain = async () => {
+      await checkUnpaid();
+      if (await treasury.paidPayrollReferences(work)) throw new Error('The treasury already recorded this payroll reference as paid. Do not resend.');
+    };
+    await unpaidOnChain();
+    const args = [call.issueId, call.contributorGithub, call.role, call.recipient, call.amount];
+    await treasury.payPayroll.staticCall(...args);
+    if (!confirm(`Send ${entry.amount} USDC on Base from the project treasury to ${entry.contributor} (@${entry.contributorGithub}) for ${entry.issueRef}, role ${entry.role || 'contributor'}? The treasury records this work reference once and rejects duplicates. This is a real, irreversible token transfer.`)) return null;
     // Recheck after the review dialog; another client may have paid while it was open.
-    await checkUnpaid();
+    await unpaidOnChain();
     if (Number((await wallet.getNetwork()).chainId) !== 8453) throw new Error('Wallet network changed; switch back to Base before payment');
-    const tx = await treasury.payToken(core.USDC, entry.contributor, amount, reference);
+    const tx = await treasury.payPayroll(...args);
     recordSubmission(tx.hash);
     const receipt = await tx.wait();
     return core.verifyReceipt({ entry, config, receipt, ethers });
@@ -103,8 +110,9 @@
       const [queue, accounts, config] = data;
       if (Number(BigInt(await reader.send('eth_chainId', []))) !== 8453) throw new Error('Payroll RPC is not on Base');
       const token = new ethers.Contract(core.USDC, core.TOKEN_ABI, reader);
+      const treasury = new ethers.Contract(config.treasuryAddress, core.PAYMENT_ABI, reader);
       const [units, decimals, payments] = await Promise.all([
-        token.balanceOf(config.treasuryAddress), token.decimals(),
+        treasury.availableUSDC(), token.decimals(),
         scanPayments({ provider: reader, config, core, ethers }),
       ]);
       if (Number(decimals) !== 6) throw new Error('USDC decimals verification failed');
@@ -141,7 +149,7 @@
       accountBody.replaceChildren();
       if (!snapshot) return;
       const { queue, accounts, units, payments } = snapshot;
-      balance.textContent = `Project treasury: ${core.formatUnits(units)} USDC on Base. Pending repo rewards: ${core.formatUnits(queue.pending.reduce((total, entry) => total + core.amountUnits(entry.amount), 0n))} USDC.`;
+      balance.textContent = `Project treasury: ${core.formatUnits(units)} USDC available on Base (store escrow excluded). Pending repo rewards: ${core.formatUnits(queue.pending.reduce((total, entry) => total + core.amountUnits(entry.amount), 0n))} USDC.`;
       for (const account of accounts.contributors) {
         const row = document.createElement('tr');
         cell(row, account.github);

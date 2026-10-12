@@ -1,0 +1,8 @@
+{
+  "chainId": 8453,
+  "address": "0xf75d1688D01fE29235B3bde450B615e4f3d2254A",
+  "deploymentBlock": 52513179,
+  "ready": true,
+  "rpcUrl": "https://base-rpc.publicnode.com",
+  "usdcAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+}

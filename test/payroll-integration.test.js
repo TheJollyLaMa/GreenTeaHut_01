@@ -2,20 +2,21 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const ganache = require('ganache');
 const ethers = require('ethers');
-const { compile } = require('../scripts/compile-treasury');
+const { compileV2 } = require('../scripts/compile-v2');
+const { hashEntries } = require('../scripts/ledger-snapshot');
 const core = require('../web/payroll-core');
 const config = require('../payroll-assets.json');
 const { createBountyEntries, applyAccountAccrual } = require('../scripts/payroll');
 const { settleVerifiedPayment } = require('../scripts/settlePayroll');
 const { sendPayment } = require('../web/repo-payroll');
 
-test('queued six-decimal reward moves real local tokens through treasury and settles verified receipt', async () => {
+test('queued six-decimal reward moves real local tokens through the V2 treasury once and settles verified receipt', async () => {
   const rpc = ganache.provider({ chain: { chainId: 8453 }, logging: { quiet: true } });
   const provider = new ethers.BrowserProvider(rpc, undefined, { cacheTimeout: -1 });
   provider.pollingInterval = 10;
   try {
     const [owner, recipient] = await Promise.all([provider.getSigner(0), provider.getSigner(1)]);
-    const { output } = compile({ 'PayrollUSDC.sol': { content: `
+    const { output } = compileV2({ 'PayrollUSDC.sol': { content: `
       // SPDX-License-Identifier: MIT
       pragma solidity ^0.8.20;
       import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -28,14 +29,17 @@ test('queued six-decimal reward moves real local tokens through treasury and set
       const contract = await new ethers.ContractFactory(artifact.abi, artifact.evm.bytecode.object, owner).deploy(...args);
       return contract.waitForDeployment();
     };
-    const ledger = await deploy(output.contracts['contracts/ProjectTreasuryLedger.sol'].ProjectTreasuryLedger,
-      [await owner.getAddress(), 1, '0x' + 'ab'.repeat(32), 0, ethers.ZeroHash]);
+    const history = require('../web/base-history.json').entries;
+    const ledger = await deploy(output.contracts['contracts/ProjectTreasuryV2.sol'].ProjectTreasuryV2,
+      [await owner.getAddress(), core.PREVIOUS_TREASURY, 1, '0x' + 'ab'.repeat(32), history.length, hashEntries(history)]);
+    await (await ledger.importHistory(history)).wait();
+    await (await ledger.finalizeMigration()).wait();
     const token = await deploy(output.contracts['PayrollUSDC.sol'].PayrollUSDC);
     // Only the in-process test chain uses mainnet addresses; no public RPC or signer is used.
     for (const [contract, address] of [[ledger, core.TREASURY], [token, core.USDC]]) {
       const original = await contract.getAddress();
       await provider.send('evm_setAccountCode', [address, await provider.getCode(original)]);
-      for (let slot = 0; slot < 12; slot += 1) {
+      for (let slot = 0; slot < 32; slot += 1) {
         const storage = await provider.getStorage(original, slot);
         await provider.send('evm_setAccountStorageAt', [address, ethers.toBeHex(slot, 32),
           ethers.zeroPadValue(storage === '0x' ? '0x00' : storage, 32)]);
@@ -63,6 +67,9 @@ test('queued six-decimal reward moves real local tokens through treasury and set
     assert.equal(proof.txHash, txHash);
     assert.equal(await localToken.balanceOf(await recipient.getAddress()), 12345678n);
     assert.equal(await localToken.balanceOf(core.TREASURY), 7654322n);
+    const treasury = new ethers.Contract(core.TREASURY, ledger.interface, owner);
+    assert.equal(await treasury.paidPayrollReferences(core.workReference(entries[0], ethers)), true);
+    await assert.rejects(treasury.payPayroll(123, 'builder', 0, await recipient.getAddress(), 1));
     // Ganache has no consensus finality; latest is the finalized test checkpoint.
     const finalityProvider = {
       send: (...args) => provider.send(...args),

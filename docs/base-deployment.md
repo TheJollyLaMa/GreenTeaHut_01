@@ -2,9 +2,9 @@
 
 ## Status and custody
 
-**Deployed, migrated and tested** on Base at
+**Retired.** Superseded by V2 (see below). V1 was deployed, migrated and tested on Base at
 `0x757B1F856f2Faea5a661820f9da56af032B1F9a1`.
-The main project page now uses Base; Optimism is historical provenance only.
+Optimism is historical provenance only.
 Sourcify verified an exact creation/runtime source match:
 https://repo.sourcify.dev/8453/0x757B1F856f2Faea5a661820f9da56af032B1F9a1
 BaseScan also displays verified source:
@@ -244,3 +244,18 @@ rather than inventing balances or confirming a payment.
 Decent Canopy's project treasury metadata uses the verified Base address and
 deployment status. Its Optimism entry remains historical provenance, never a
 receiving address.
+
+## Replacement treasury V2 (active)
+
+`ProjectTreasuryV2` at `0xf75d1688D01fE29235B3bde450B615e4f3d2254A` (block `52513179`, Sourcify exact match) adds
+on-chain unique payroll references and the greenhouse storefront escrow. It
+replaced the V1 treasury above by importing V1's finalized history; it does not
+upgrade V1. V1 is **retired**: the site no longer reads or pays from it, and it
+must not receive funds. Activation (`npm run activate:v2 -- <address>`) is
+read-only and refuses to switch unless V1 is unchanged and empty, V2's runtime,
+owner, predecessor and imported history match, and finalized ETH and USDC smoke
+round trips exist on V2. See
+[storefront.md](storefront.md#cutover-tooling-prepared-nothing-sent) for the
+export, plan, dry-run, deploy, and smoke commands. The V1 smoke script accepts
+`--v2 <address>`, which uses separate state files:
+`.base-v2-smoke-state.json` and `.base-v2-usdc-smoke-state.json`.

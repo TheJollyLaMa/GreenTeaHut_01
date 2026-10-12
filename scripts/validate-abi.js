@@ -95,7 +95,8 @@ function main() {
   for (const contractName of Object.keys(contracts)) {
     const contract = contracts[contractName];
     const networks = contract.networks || {};
-    if (appChainId && networks[appChainId]) {
+    // Retired deployments stay documented in metadata but are no longer served by the app.
+    if (appChainId && networks[appChainId] && networks[appChainId].status !== 'retired') {
       matchedNetwork = true;
       const metaAddress = networks[appChainId].address;
       if (!appAddress || !metaAddress || appAddress.toLowerCase() !== metaAddress.toLowerCase()) {

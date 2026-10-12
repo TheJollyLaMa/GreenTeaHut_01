@@ -72,6 +72,9 @@ web_modules/
 .base-deployment-state.json
 .base-smoke-state.json
 .base-usdc-smoke-state.json
+.base-v2-deployment-state.json
+.base-v2-smoke-state.json
+.base-v2-usdc-smoke-state.json
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

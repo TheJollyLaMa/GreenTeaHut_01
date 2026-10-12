@@ -3,8 +3,18 @@
   "chainName": "Base",
   "rpcUrl": "https://base-rpc.publicnode.com",
   "explorerUrl": "https://basescan.org",
-  "address": "0x757B1F856f2Faea5a661820f9da56af032B1F9a1",
-  "deploymentBlock": 52508544,
+  "version": 2,
+  "contract": "ProjectTreasuryV2",
+  "abiFile": "treasury-v2-abi.json",
+  "historyFile": "base-history.json",
+  "address": "0xf75d1688D01fE29235B3bde450B615e4f3d2254A",
+  "deploymentBlock": 52513179,
   "owner": "0x807061DF657A7697c04045dA7d16D941861cAABc",
-  "ready": true
+  "ready": true,
+  "previous": {
+    "contract": "ProjectTreasuryLedger",
+    "address": "0x757B1F856f2Faea5a661820f9da56af032B1F9a1",
+    "deploymentBlock": 52508544,
+    "status": "retired"
+  }
 }

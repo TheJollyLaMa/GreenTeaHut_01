@@ -1,0 +1,9 @@
+{
+  "sample": true,
+  "products": [
+    { "id": "demo-seeds", "kind": 0, "name": "Heirloom tomato seeds", "description": "Sample packet of seeds for a sunny growing season.", "price": "3.5", "available": "20", "pickup": "Example only: arrange pickup at the greenhouse.", "active": true },
+    { "id": "demo-starter", "kind": 1, "name": "Basil starter plant", "description": "Sample greenhouse-grown starter in a small pot.", "price": "5", "available": "12", "pickup": "Example only: arrange pickup at the greenhouse.", "active": true },
+    { "id": "demo-cutting", "kind": 2, "name": "Rosemary cutting", "description": "Sample rooted cutting, ready for your garden.", "price": "4", "available": "8", "pickup": "Example only: arrange pickup at the greenhouse.", "active": true },
+    { "id": "demo-harvest", "kind": 3, "name": "Greenhouse harvest basket", "description": "Sample seasonal vegetables and herbs; contents vary.", "price": "15", "available": "6", "pickup": "Example only: arrange pickup at the greenhouse.", "active": true }
+  ]
+}

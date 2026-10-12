@@ -285,6 +285,10 @@
         aria-pressed="false"
         title="Labor & Services Payout"
       >🎖️</button>
+      <button type="button" class="toolbar-item" id="toolbar-storefront"
+        aria-label="Open greenhouse storefront" aria-pressed="false" title="Greenhouse storefront">
+        <span class="storefront-emoji-clump" aria-hidden="true"><span>🌻</span><span>🌱</span><span>🍄‍🟫</span><span>🌱</span><span>🪻</span></span>
+      </button>
     </nav>
 
     <!-- Wallet & Connection info panel -->
@@ -529,9 +533,56 @@
       </section>
     </div><!-- #payout-view -->
 
+    <div id="storefront-view" class="storefront-view" hidden aria-label="Greenhouse storefront">
+      <section class="payout-section">
+        <p class="storefront-eyebrow">From our greenhouse to your garden</p>
+        <h2 class="payout-heading">Greenhouse storefront</h2>
+        <p class="payout-copy">Seeds, starter plants, cuttings, and fresh greenhouse harvest. Native USDC on Base, with local pickup.</p>
+        <p id="storefront-mode" class="storefront-demo-banner" role="status">Sample catalog - not for sale. No checkout transactions are enabled.</p>
+        <p id="storefront-status" class="payout-status" role="status" aria-live="polite"></p>
+        <button id="storefront-refresh" type="button" class="entry-submit">Refresh store</button>
+        <button id="storefront-connect" type="button" class="entry-submit">Connect store wallet</button>
+        <label class="payout-field"><span>Browse goods</span><select id="storefront-filter">
+          <option value="all">All greenhouse goods</option><option value="0">Seeds</option>
+          <option value="1">Starter plants</option><option value="2">Cuttings</option><option value="3">Harvest</option>
+        </select></label>
+        <div id="storefront-products" class="storefront-products"></div>
+      </section>
+      <section class="payout-section" aria-label="Pickup orders">
+        <h3 class="payout-subheading">Your pickup orders</h3>
+        <p class="payout-copy">Live payments stay reserved until your order is ready and you confirm pickup with your wallet. Cancel for a full refund before pickup; uncollected orders expire after 14 days. Never put contact details, addresses, or private pickup codes on-chain.</p>
+        <div id="storefront-orders"></div>
+      </section>
+      <section class="payout-section" aria-label="Manage greenhouse goods">
+        <h3 class="payout-subheading">Manage greenhouse goods</h3>
+        <p id="storefront-admin-note" class="payout-copy">Demo editor: changes are saved only in this browser and are not live products. After deployment, the owner and approved managers can publish real goods through this form.</p>
+        <form id="storefront-product-form" class="payout-form-grid">
+          <label class="payout-field"><span>Product</span><select id="storefront-edit-id"><option value="">Add a new product</option></select></label>
+          <label class="payout-field"><span>Category</span><select id="storefront-kind">
+            <option value="0">Seeds</option><option value="1">Starter plants</option><option value="2">Cuttings</option><option value="3">Harvest</option>
+          </select></label>
+          <label class="payout-field"><span>Product name</span><input id="storefront-name" maxlength="80" required /></label>
+          <label class="payout-field"><span>Price (USDC per unit)</span><input id="storefront-price" inputmode="decimal" placeholder="3.5" required /></label>
+          <label class="payout-field"><span>Available units</span><input id="storefront-stock" type="number" min="0" max="1000000" step="1" required /></label>
+          <label class="payout-field"><span>Listing visibility (demo is never for sale)</span><select id="storefront-active"><option value="true">Listed</option><option value="false">Hidden / paused</option></select></label>
+          <label class="payout-field payout-field-full"><span>Description (public)</span><textarea id="storefront-description" maxlength="1200" required></textarea></label>
+          <label class="payout-field payout-field-full"><span>Pickup instructions (public; no private data)</span><textarea id="storefront-pickup" maxlength="600" required></textarea></label>
+          <label class="payout-field payout-field-full"><span>Published product JSON URL (live mode only)</span><input id="storefront-metadata-url" type="url" maxlength="512" placeholder="https://your-project.example/products/basil.json" /></label>
+          <p class="payout-copy payout-field-full">In live mode, download the product JSON below, publish it at an HTTPS URL that permits cross-origin reads, and enter that URL here. Publishing checks the JSON against your form and records its content hash on-chain. Changes require a new listing revision. No uploads or contact data are sent by this editor.</p>
+          <button id="storefront-download" type="button" class="entry-submit">Download product JSON</button>
+          <button id="storefront-save" type="submit" class="entry-submit">Save demo product</button>
+        </form>
+        <button id="storefront-reset-demo" type="button" class="entry-submit">Reset sample catalog</button>
+        <button id="storefront-open" type="button" class="entry-submit" disabled>Open live store (owner only)</button>
+        <button id="storefront-close" type="button" class="entry-submit" disabled>Pause live store (owner only)</button>
+        <div id="storefront-admin-orders"></div>
+      </section>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
     <script src="payroll-core.js"></script>
     <script src="repo-payroll.js"></script>
+    <script src="storefront.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

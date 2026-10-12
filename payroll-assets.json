@@ -2,8 +2,8 @@
   "chainId": 8453,
   "rpcUrl": "https://base-rpc.publicnode.com",
   "repository": "TheJollyLaMa/GreenTeaHut_01",
-  "treasuryAddress": "0x757B1F856f2Faea5a661820f9da56af032B1F9a1",
-  "deploymentBlock": 52508544,
+  "treasuryAddress": "0xf75d1688D01fE29235B3bde450B615e4f3d2254A",
+  "deploymentBlock": 52513179,
   "assets": {
     "USDC": {
       "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
