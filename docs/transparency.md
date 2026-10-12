@@ -24,6 +24,35 @@ Once an entry reaches CONFIRMED or CANCELED status, amount revisions are blocked
 
 Balance displays clearly indicate whether pending/requested values are included.
 
+## Base treasury and historical migration
+
+The original Optimism contract is accounting-only, not a receiving wallet.
+Never send funds to it.
+
+The deployed Base `ProjectTreasuryLedger` at
+`0x757B1F856f2Faea5a661820f9da56af032B1F9a1` can hold native ETH and
+ordinary ERC-20s. Its owner and owner-approved project managers can send funds.
+Every treasury-mediated receipt and payout emits an asset-specific event.
+USD accounting entries do not move assets; a confirmed accounting entry is not
+proof of the treasury's current balance. Consult the actual on-chain ETH or token
+balance, not the accounting totals, before spending.
+
+All imported Optimism entries are read-only history, including entries whose
+original status is PENDING or REQUESTED. Importing records neither transfers nor
+bridges funds. Original source event logs (including amount revisions) are
+preserved in `web/optimism-history.json`; they are not re-emitted as Base payments.
+The Base contract commits to the complete entry snapshot and its OP block/hash.
+
+Direct ERC-20 transfers and forced ETH receipts may not emit treasury events.
+The UI explicitly separates event history from actual balances. Unsupported,
+malicious, frozen, or restricted tokens may be impossible to transfer; supporting
+ERC-20 does not guarantee that every arbitrary token is recoverable. Do not send
+NFTs or assets on other chains to the treasury.
+
+Deployment, full history migration, and live ETH/native Base USDC receive/send
+tests are verified. Source has an exact Sourcify creation/runtime match.
+See [Base deployment record and checklist](base-deployment.md).
+
 ## Update cadence
 Ledger updates are published at least once per month, with additional updates whenever meaningful funding or spending activity occurs.
 

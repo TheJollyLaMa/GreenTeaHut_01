@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "contracts": {
     "ProjectLedger": {
-      "description": "Green Tea Hut #1 — Public Accountability Ledger",
+      "description": "Legacy Optimism accounting-only prototype",
       "abiVersion": "2.0.0",
       "sourceFile": "contracts/ProjectLedger.sol",
       "artifactFile": "contracts_ProjectLedger_sol_ProjectLedger.bin",
@@ -11,7 +11,8 @@
         "10": {
           "chainName": "Optimism",
           "address": "0x44500FFd99B621620f393FCdbcF55D5137A55A23",
-          "explorerUrl": "https://optimistic.etherscan.io/address/0x44500FFd99B621620f393FCdbcF55D5137A55A23"
+          "explorerUrl": "https://optimistic.etherscan.io/address/0x44500FFd99B621620f393FCdbcF55D5137A55A23",
+          "status": "legacy-accounting-only"
         }
       },
       "requiredSelectors": {
@@ -23,6 +24,28 @@
         "0xf5827b92": "confirmEntry(uint256,string)",
         "0xfda1e612": "updateReferenceURI(uint256,string)",
         "0xd176d896": "updatePendingAmount(uint256,uint256,string,string)"
+      }
+    },
+    "ProjectTreasuryLedger": {
+      "description": "Green Tea Hut #1 - Base ETH/ERC20 treasury and historical ledger",
+      "abiVersion": "3.0.0",
+      "sourceFile": "contracts/ProjectTreasuryLedger.sol",
+      "artifactFile": "artifacts/ProjectTreasuryLedger.json",
+      "compiler": "solc 0.8.30",
+      "abiFile": "web/treasury-abi.json",
+      "deploymentConfig": "web/base-deployment.json",
+      "networks": {
+        "8453": {
+          "chainName": "Base",
+          "address": "0x757B1F856f2Faea5a661820f9da56af032B1F9a1",
+          "status": "deployed",
+          "explorerUrl": "https://basescan.org/address/0x757B1F856f2Faea5a661820f9da56af032B1F9a1"
+        }
+      },
+      "requiredSelectors": {
+        "0x7fef036e": "totalEntries()",
+        "0xbae78d7b": "getEntry(uint256)",
+        "0x8da5cb5b": "owner()"
       }
     }
   }

@@ -1,0 +1,26 @@
+{
+  "name": "green-tea-hut-ledger",
+  "version": "3.0.0",
+  "private": true,
+  "scripts": {
+    "compile": "node scripts/compile-treasury.js",
+    "test:treasury": "node --test test/treasury.test.js test/migration.test.js",
+    "export:optimism": "node scripts/export-optimism.js",
+    "prepare:base": "node scripts/prepare-base.js",
+    "deploy:base:check": "node scripts/deploy-base.js",
+    "deploy:base": "node scripts/deploy-base.js --broadcast",
+    "smoke:base:check": "node scripts/smoke-base.js",
+    "smoke:base": "node scripts/smoke-base.js --broadcast",
+    "smoke:base:usdc:check": "node scripts/smoke-base.js --usdc",
+    "smoke:base:usdc": "node scripts/smoke-base.js --usdc --broadcast",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "5.4.0",
+    "ethers": "6.13.2"
+  },
+  "devDependencies": {
+    "ganache": "7.9.2",
+    "solc": "0.8.30"
+  }
+}

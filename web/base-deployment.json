@@ -1,0 +1,10 @@
+{
+  "chainId": 8453,
+  "chainName": "Base",
+  "rpcUrl": "https://base-rpc.publicnode.com",
+  "explorerUrl": "https://basescan.org",
+  "address": "0x757B1F856f2Faea5a661820f9da56af032B1F9a1",
+  "deploymentBlock": 52508544,
+  "owner": "0x807061DF657A7697c04045dA7d16D941861cAABc",
+  "ready": true
+}

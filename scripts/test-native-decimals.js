@@ -42,8 +42,8 @@ const source = fs.readFileSync(APP_JS, 'utf8');
 // ---------------------------------------------------------------------------
 console.log('\n=== 1. Contract address updated to new deployment ===');
 assert(
-  source.includes('0x44500FFd99B621620f393FCdbcF55D5137A55A23'),
-  'LEDGER_CONFIG.contractAddress is the new deployment address',
+  source.includes('0x757B1F856f2Faea5a661820f9da56af032B1F9a1'),
+  'LEDGER_CONFIG.contractAddress is the active Base deployment address',
 );
 assert(
   !source.includes('0x942CcE8384a9d9bd2842365395d7a912e1a5322c'),
@@ -215,7 +215,7 @@ assert(
 // ---------------------------------------------------------------------------
 // 9. Verify owner() used instead of ADMIN_ROLE()/hasRole()
 // ---------------------------------------------------------------------------
-console.log('\n=== 9. owner() used for admin check (not role-based) ===');
+console.log('\n=== 9. Owner and approved managers used for write access ===');
 assert(
   source.includes('readContract.owner()'),
   'refreshWalletState calls owner() to determine admin',
@@ -261,4 +261,3 @@ if (failed > 0) {
 }
 console.log('\nAll tests passed.');
 process.exit(0);
-

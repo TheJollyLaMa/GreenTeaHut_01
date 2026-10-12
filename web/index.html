@@ -141,6 +141,10 @@
       </section>
 
       <div id="ledger-view">
+        <p class="entry-helper"><strong>Live on Base.</strong>
+          <a href="treasury.html">Deposit ETH / USDC, send project funds, and manage treasury access</a>.
+          The seven imported prototype entries are read-only history, not Base cash on hand.
+          USD totals below are accounting figures; actual asset balances are shown in the treasury.</p>
         <section class="filters" aria-label="Ledger filters">
           <label for="type-filter">
             Type
@@ -328,9 +332,9 @@
         </div>
         <div class="payout-note">
           <p><strong>MVP guardrails:</strong> one active shift per worker per site, signed QR nonce replay protection, 10-minute QR freshness, and one-time transfer confirmation per shift.</p>
-          <p><strong>MVP payment handling:</strong> Payments are recorded here; transfer is executed externally in MVP.</p>
+          <p><strong>MVP payment handling:</strong> Labor payments are recorded here; use the <a href="treasury.html">Base treasury</a> to execute an on-chain payout separately. Confirmation here records proof only and does not send funds.</p>
           <p><strong>Status guide:</strong> <code>COMMITTED</code> = approved, awaiting transfer. <code>CONFIRMED</code> = transfer completed + proof attached.</p>
-          <p><strong>Deployment recommendation:</strong> use <strong>Option 1</strong> for this MVP — keep `ProjectLedger` as the public record of requested/committed/confirmed labor payouts and execute payout settlement off-chain. <strong>Option 2</strong> remains a future path if on-chain escrow or ABI-level shift state becomes necessary.</p>
+          <p><strong>Migration:</strong> new labor accounting uses the Base ledger. Old browser-local prototype shifts are retained under their original storage key but are not automatically resynced or paid.</p>
         </div>
       </section>
 

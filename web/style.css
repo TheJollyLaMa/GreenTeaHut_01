@@ -470,6 +470,25 @@ a {
   gap: 0.8rem;
 }
 
+.treasury-page main {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.treasury-page .entry-form fieldset {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.8rem;
+  grid-column: 1 / -1;
+  border: 0;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+
+.treasury-page td {
+  overflow-wrap: anywhere;
+}
+
 .field-error {
   min-height: 1rem;
   font-size: 0.78rem;

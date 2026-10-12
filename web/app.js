@@ -126,20 +126,32 @@ if (aboutModal && aboutTrigger && modalClose) {
 
 // --- Ledger (on-chain) ---
 const LEDGER_CONFIG = {
-  contractAddress: '0x44500FFd99B621620f393FCdbcF55D5137A55A23',
-  targetChainId: 10,
-  targetChainName: 'Optimism',
-  explorerBaseUrl: 'https://optimistic.etherscan.io/tx/',
-  explorerAddressBaseUrl: 'https://optimistic.etherscan.io/address/',
-  rpcUrl: 'https://mainnet.optimism.io',
+  contractAddress: '0x757B1F856f2Faea5a661820f9da56af032B1F9a1',
+  targetChainId: 8453,
+  targetChainName: 'Base',
+  explorerBaseUrl: 'https://basescan.org/tx/',
+  explorerAddressBaseUrl: 'https://basescan.org/address/',
+  rpcUrl: 'https://base-rpc.publicnode.com',
   entryPageSize: 20,
+  deploymentBlock: 52508544,
 };
+let deploymentVerified = false;
+let optimismHistory = null;
 
 const PROJECT_LEDGER_ABI = [
   // View — ledger reads
   'function totalEntries() view returns (uint256)',
   'function getEntry(uint256 entryId) view returns (tuple(uint256 id, uint256 amount, uint8 entryType, uint8 status, string category, string description, string referenceURI, uint256 createdAt, uint256 settledAt))',
   'function owner() view returns (address)',
+  'function managers(address) view returns (bool)',
+  'function historicalEntries() view returns (uint256)',
+  'function historyHash() view returns (bytes32)',
+  'function importedHash() view returns (bytes32)',
+  'function migrationFinalized() view returns (bool)',
+  'function sourceBlock() view returns (uint256)',
+  'function sourceBlockHash() view returns (bytes32)',
+  'function sourceLedger() view returns (address)',
+  'function sourceChainId() view returns (uint256)',
   // Write — ledger mutations
   'function createEntry(uint8 entryType, uint8 status, uint256 amount, string category, string description, string referenceURI) returns (uint256 entryId)',
   'function updateStatus(uint256 entryId, uint8 newStatus)',
@@ -148,6 +160,7 @@ const PROJECT_LEDGER_ABI = [
   'function updatePendingAmount(uint256 entryId, uint256 newAmount, string reason, string referenceURI)',
   // Events — required for queryFilter to decode logs
   'event AmountUpdated(uint256 indexed id, uint256 oldAmount, uint256 newAmount, address indexed updatedBy, string reason, string referenceURI)',
+  'event EntryCreated(uint256 indexed id, uint8 indexed entryType, uint8 status, uint256 amount, string category, string description, string referenceURI, uint256 createdAt)',
 ];
 
 const STATUS_PENDING = 'PENDING';
@@ -249,7 +262,8 @@ const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 const ACCRUAL_BUCKETS_PER_HOUR = 4;
 const MIN_HOURLY_RATE_USD = ACCRUAL_BUCKETS_PER_HOUR;
 const MAX_DISPLAYED_PAYOUT_EVENTS = 20;
-const PAYOUT_STORAGE_KEY = 'gth-payout-mvp-v1';
+// Legacy OP shifts remain in their original storage namespace, never reused as Base IDs.
+const PAYOUT_STORAGE_KEY = 'gth-payout-base-v1';
 const payoutPendingActions = new Set();
 let payoutServerTimestampCache = '';
 let payoutClock = null;
@@ -609,13 +623,8 @@ function renderLedgerContractHeadingLink() {
   ledgerContractLinkEl.hidden = false;
   ledgerContractLinkEl.href = `${LEDGER_CONFIG.explorerAddressBaseUrl}${addr}`;
   ledgerContractLinkEl.textContent = formatLedgerHeadingAddress(addr);
-  ledgerContractLinkEl.title = `${addr} (click to open on OptimismScan; copied to clipboard when allowed)`;
-  ledgerContractLinkEl.setAttribute('aria-label', `View ProjectLedger contract on OptimismScan: ${addr}`);
-  ledgerContractLinkEl.onclick = () => {
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      navigator.clipboard.writeText(addr).catch(() => {});
-    }
-  };
+  ledgerContractLinkEl.title = `${addr} (Base project treasury and ledger)`;
+  ledgerContractLinkEl.setAttribute('aria-label', `View Base project treasury and ledger on BaseScan: ${addr}`);
 }
 
 function setFieldError(fieldName, message) {
@@ -660,6 +669,7 @@ function normalizeEntry(entry) {
     category: entry.category || '',
     description: entry.description || '',
     reference: entry.referenceURI || '',
+    historical: optimismHistory !== null && BigInt(entry.id) <= BigInt(optimismHistory.count),
   };
 }
 
@@ -819,7 +829,7 @@ function createRevisionDetailRow(entry) {
         if (rev.updatedBy) parts.push(`by ${shortAddress(rev.updatedBy)}`);
         if (rev.transactionHash) {
           const txAnchor = document.createElement('a');
-          txAnchor.href = `${LEDGER_CONFIG.explorerBaseUrl}${rev.transactionHash}`;
+          txAnchor.href = `${rev.explorerBaseUrl || LEDGER_CONFIG.explorerBaseUrl}${rev.transactionHash}`;
           txAnchor.target = '_blank';
           txAnchor.rel = 'noopener noreferrer';
           txAnchor.textContent = `block #${rev.blockNumber}`;
@@ -1016,6 +1026,10 @@ function createActionsCell(entry) {
   const actionsCell = document.createElement('td');
   const actionsWrap = document.createElement('div');
   actionsWrap.className = 'actions-wrap';
+  if (entry.historical) {
+    actionsCell.textContent = 'Imported history (read-only)';
+    return actionsCell;
+  }
 
   // isSoftEntry: true for any status that can still be revised or settled.
   const isSoftEntry = entry.status === STATUS_PENDING || entry.status === STATUS_REQUESTED || entry.status === STATUS_COMMITTED;
@@ -1155,7 +1169,7 @@ function getReadContract() {
   if (typeof window.ethers === 'undefined') {
     throw new Error('Ethers library failed to load. Refresh the page and try again.');
   }
-  const provider = new window.ethers.JsonRpcProvider(LEDGER_CONFIG.rpcUrl);
+  const provider = new window.ethers.JsonRpcProvider(LEDGER_CONFIG.rpcUrl, 8453, { staticNetwork: true });
   return { contract: new window.ethers.Contract(LEDGER_CONFIG.contractAddress, PROJECT_LEDGER_ABI, provider), provider };
 }
 
@@ -1247,6 +1261,10 @@ async function validateContractInterface() {
 }
 
 async function getSignerContract() {
+  if (!deploymentVerified) {
+    setTxStatus('Base deployment verification has not completed. Write actions are disabled.', 'error');
+    return null;
+  }
   const ethereumProvider = getEthereumProvider();
   if (!ethereumProvider) {
     setTxStatus('MetaMask is required for admin write actions.', 'error');
@@ -1254,6 +1272,10 @@ async function getSignerContract() {
   }
 
   const provider = new window.ethers.BrowserProvider(ethereumProvider, 'any');
+  if (Number((await provider.getNetwork()).chainId) !== 8453) {
+    setTxStatus('Switch your wallet to Base mainnet (8453) before submitting a transaction.', 'error');
+    return null;
+  }
   const signer = await provider.getSigner();
   return new window.ethers.Contract(LEDGER_CONFIG.contractAddress, PROJECT_LEDGER_ABI, signer);
 }
@@ -1297,7 +1319,7 @@ async function fetchEntriesFromContract() {
 async function fetchAmountUpdatedEvents(contract) {
   try {
     const filter = contract.filters.AmountUpdated();
-    const logs = await contract.queryFilter(filter);
+    const logs = await contract.queryFilter(filter, LEDGER_CONFIG.deploymentBlock);
     const map = new Map();
     for (const log of logs) {
       const id = toNumeric(log.args.id);
@@ -1310,6 +1332,23 @@ async function fetchAmountUpdatedEvents(contract) {
         updatedBy: String(log.args.updatedBy || ''),
         blockNumber: log.blockNumber,
         transactionHash: log.transactionHash || '',
+      });
+    }
+    // Revisions before migration keep their original OP explorer provenance.
+    for (const sourceLog of optimismHistory?.events || []) {
+      const log = contract.interface.parseLog(sourceLog);
+      if (!log || log.name !== 'AmountUpdated') continue;
+      const id = toNumeric(log.args.id);
+      if (!map.has(id)) map.set(id, []);
+      map.get(id).push({
+        oldAmount: toNumeric(log.args.oldAmount),
+        newAmount: toNumeric(log.args.newAmount),
+        reason: String(log.args.reason),
+        referenceURI: String(log.args.referenceURI),
+        updatedBy: String(log.args.updatedBy),
+        blockNumber: sourceLog.blockNumber,
+        transactionHash: sourceLog.transactionHash,
+        explorerBaseUrl: 'https://optimistic.etherscan.io/tx/',
       });
     }
     // Ensure revisions within each entry are ordered oldest → newest by block.
@@ -1368,20 +1407,22 @@ async function refreshWalletState() {
     return;
   }
 
-  let isOwner = false;
+  let authorized = false;
   try {
     const readContract = getReadContract().contract;
-    const ownerAddress = await readContract.owner();
-    isOwner = ownerAddress.toLowerCase() === currentAccount.toLowerCase();
+    const [ownerAddress, manager] = await Promise.all([readContract.owner(), readContract.managers(currentAccount)]);
+    authorized = ownerAddress.toLowerCase() === currentAccount.toLowerCase() || manager;
   } catch (error) {
     console.error(error);
   }
 
-  isAdminWallet = isOwner;
+  isAdminWallet = authorized && deploymentVerified;
   setFormEnabled(isAdminWallet);
 
   if (isAdminWallet) {
     setWalletStatus(`Connected: ${shortAddress(currentAccount)} (admin write access)`);
+  } else if (!deploymentVerified) {
+    setWalletStatus('Base deployment is not verified; write actions are disabled.');
   } else {
     setWalletStatus(`Connected: ${shortAddress(currentAccount)} (read-only; admin wallet required)`);
   }
@@ -2129,7 +2170,7 @@ function hydratePayoutReviewForm(announce = true) {
 
 async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reasonNote) {
   if (!isAdminWallet) {
-    return { ok: false, message: 'Connect the admin wallet on Optimism to sync payout lifecycle artifacts to ProjectLedger.' };
+    return { ok: false, message: 'Connect the owner or an approved manager on Base to sync labor accounting entries.' };
   }
   if (!shift.clockedOutAt) {
     await closeShiftRecord(shift, 'reviewer', reviewerWallet);
@@ -2178,8 +2219,6 @@ async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reason
       return { ok: true, entryId: shift.ledgerEntryId };
     }
 
-    const { contract: readContract } = getReadContract();
-    const previousTotal = toNumeric(await readContract.totalEntries());
     const payload = buildShiftLedgerMetadata(shift, approvedAmount, reviewerWallet);
     const result = await runTransaction('Labor request ledger sync', () =>
       signerContract.createEntry(
@@ -2193,7 +2232,12 @@ async function syncRequestedLedger(shift, approvedAmount, reviewerWallet, reason
     );
     if (!result) return { ok: false, message: 'Unable to create the requested labor ledger entry.' };
 
-    shift.ledgerEntryId = previousTotal + 1;
+    const event = result.receipt.logs
+      .filter((log) => log.address.toLowerCase() === LEDGER_CONFIG.contractAddress.toLowerCase())
+      .map((log) => signerContract.interface.parseLog(log))
+      .find((log) => log?.name === 'EntryCreated');
+    if (!event) return { ok: false, message: `Labor request transaction ${result.tx.hash} succeeded but its entry ID could not be decoded. Do not resubmit; inspect the receipt.` };
+    shift.ledgerEntryId = toNumeric(event.args.id);
     shift.ledgerAmount = approvedAmount;
     shift.ledgerStatus = STATUS_REQUESTED;
     shift.ledgerRequestedTxHash = result.tx.hash;
@@ -2416,6 +2460,34 @@ function bindWalletEvents() {
 }
 
 async function init() {
+  try {
+    const responses = await Promise.all([
+      window.fetch('base-deployment.json', { cache: 'no-store' }),
+      window.fetch('optimism-history.json', { cache: 'no-store' }),
+    ]);
+    if (responses.some((response) => !response.ok)) throw new Error('Unable to load Base deployment or history snapshot');
+    const [deployment, history] = await Promise.all(responses.map((response) => response.json()));
+    if (!deployment.ready || deployment.chainId !== 8453 ||
+        deployment.address?.toLowerCase() !== LEDGER_CONFIG.contractAddress.toLowerCase()) throw new Error('Base deployment configuration is not activated');
+    optimismHistory = history;
+    LEDGER_CONFIG.deploymentBlock = deployment.deploymentBlock;
+    const { contract, provider } = getReadContract();
+    const [chain, finalized, importedHash, historyHash, count, sourceBlock, sourceBlockHash, sourceLedger, sourceChain] = await Promise.all([
+      provider.send('eth_chainId', []), contract.migrationFinalized(), contract.importedHash(),
+      contract.historyHash(), contract.historicalEntries(), contract.sourceBlock(), contract.sourceBlockHash(),
+      contract.sourceLedger(), contract.sourceChainId(),
+    ]);
+    if (Number(BigInt(chain)) !== 8453 || !finalized || importedHash !== history.historyHash ||
+        historyHash !== history.historyHash || Number(count) !== history.count ||
+        Number(sourceBlock) !== history.sourceBlock || sourceBlockHash !== history.sourceBlockHash ||
+        sourceLedger.toLowerCase() !== history.sourceAddress.toLowerCase() || Number(sourceChain) !== 10) {
+      throw new Error('Base history commitment or network verification failed');
+    }
+    deploymentVerified = true;
+  } catch (error) {
+    deploymentVerified = false;
+    setTxStatus(`Base write actions are disabled: ${getErrorMessage(error)}`, 'error');
+  }
   if (walletConnectBtnEl) {
     walletConnectBtnEl.addEventListener('click', connectWallet);
   }
