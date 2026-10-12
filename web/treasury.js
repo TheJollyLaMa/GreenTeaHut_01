@@ -8,9 +8,17 @@ const TOKEN_ABI = [
   'function approve(address,uint256) returns (bool)',
 ];
 const ENTRY_STATES = ['PENDING', 'CONFIRMED', 'REQUESTED', 'COMMITTED', 'CANCELED'];
+const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+// Reviewed treasury versions and the provenance their imported history must match.
+const VERSIONS = {
+  1: { address: '0x757B1F856f2Faea5a661820f9da56af032B1F9a1', abiFile: 'treasury-abi.json', historyFile: 'optimism-history.json', sourceChainId: 10 },
+  2: { address: '0xf75d1688D01fE29235B3bde450B615e4f3d2254A', abiFile: 'treasury-v2-abi.json', historyFile: 'base-history.json', sourceChainId: 8453 },
+};
 let config;
+let version;
 let abi;
 let snapshot;
+let opSnapshot;
 let reader;
 let ledger;
 let account = '';
@@ -97,7 +105,12 @@ async function updateBalance() {
   if (!verified) return;
   const asset = await assetInfo();
   const balance = asset.token ? await asset.token.balanceOf(config.address) : await reader.getBalance(config.address);
-  $('treasury-balance').textContent = `Actual treasury balance: ${ethers.formatUnits(balance, asset.decimals)} ${asset.token ? `token (${asset.address})` : 'ETH'} on Base`;
+  let text = `Actual treasury balance: ${ethers.formatUnits(balance, asset.decimals)} ${asset.token ? `token (${asset.address})` : 'ETH'} on Base`;
+  if (config.version === 2 && asset.address.toLowerCase() === USDC.toLowerCase()) {
+    const reserved = await ledger.reservedUSDC();
+    text += `. Reserved for open storefront orders: ${ethers.formatUnits(reserved, 6)} USDC; available to spend: ${ethers.formatUnits(balance - reserved, 6)} USDC`;
+  }
+  $('treasury-balance').textContent = text;
 }
 
 async function transact(label, action) {
@@ -149,7 +162,7 @@ function renderEntries(entries) {
   for (const entry of entries) {
     const row = document.createElement('tr');
     const historical = BigInt(entry.id) <= BigInt(snapshot.count);
-    cell(row, `${entry.id} / ${historical ? 'OP history (read-only)' : 'Base'}`);
+    cell(row, `${entry.id} / ${historical ? `${BigInt(entry.id) <= BigInt(opSnapshot.count) ? 'OP' : 'previous Base treasury'} history (read-only)` : 'Base'}`);
     cell(row, String(entry.amount));
     cell(row, `${Number(entry.entryType) === 0 ? 'INCOMING' : 'OUTGOING'} / ${ENTRY_STATES[Number(entry.status)]}`);
     cell(row, `${entry.category}: ${entry.description}\nCreated: ${new Date(Number(entry.createdAt) * 1000).toISOString()}${BigInt(entry.settledAt) ? `; confirmed: ${new Date(Number(entry.settledAt) * 1000).toISOString()}` : ''}`);
@@ -203,7 +216,7 @@ async function renderTransfers() {
     if (!event || !['FundsReceived', 'FundsPaid'].includes(event.name)) continue;
     const received = event.name === 'FundsReceived';
     const row = document.createElement('tr');
-    cell(row, received ? 'Deposit' : 'Payout');
+    cell(row, received ? 'Deposit' : event.args.referenceURI.startsWith('repo-payroll:') ? 'Payroll' : 'Payout');
     cell(row, event.args.asset === ethers.ZeroAddress ? 'ETH' : event.args.asset);
     cell(row, String(event.args.amount));
     cell(row, received ? event.args.sender : event.args.recipient);
@@ -254,6 +267,7 @@ $('funds-form').addEventListener('submit', async (event) => {
     if (amount <= 0n) throw new Error('Amount must be positive');
     const reference = $('funds-reference').value.trim();
     if (!reference) throw new Error('Purpose / reference required');
+    if (paying && reference.startsWith('repo-payroll:')) throw new Error('Pay repository rewards from the Labor & Services payroll panel so the treasury records them once');
     if (paying) {
       if (!canPay) throw new Error('Only the owner and approved managers can send funds');
       const recipient = ethers.getAddress($('funds-recipient').value.trim());
@@ -320,18 +334,32 @@ $('accept-ownership').addEventListener('click', async () => {
 
 async function initialize() {
   controls();
-  [config, abi, snapshot] = await Promise.all([json('base-deployment.json'), json('treasury-abi.json'), json('optimism-history.json')]);
+  config = await json('base-deployment.json');
+  version = VERSIONS[config.version || 1];
+  if (!version || (config.historyFile || 'optimism-history.json') !== version.historyFile ||
+      (config.abiFile || 'treasury-abi.json') !== version.abiFile) throw new Error('Unknown Base treasury version');
+  [abi, snapshot, opSnapshot] = await Promise.all([json(version.abiFile), json(version.historyFile), json('optimism-history.json')]);
+  if (snapshot.sourceChainId === 8453 && (snapshot.predecessor?.historyHash !== opSnapshot.historyHash || snapshot.count < opSnapshot.count)) {
+    throw new Error('Base history snapshot does not preserve the OP history');
+  }
   $('history-provenance').append(
-    document.createTextNode(`Preserving ${snapshot.count} Optimism entries at block ${snapshot.sourceBlock}. `),
+    document.createTextNode(`Preserving ${opSnapshot.count} Optimism prototype entries at block ${opSnapshot.sourceBlock}. `),
     link('optimism-history.json', 'Original entries and event archive'),
   );
+  if (snapshot !== opSnapshot && snapshot.sourceChainId === 8453) {
+    $('history-provenance').append(
+      document.createTextNode(` Carried forward from the previous Base treasury ${snapshot.sourceAddress} at block ${snapshot.sourceBlock}: ${snapshot.count} entries. `),
+      link('base-history.json', 'Previous Base treasury snapshot'),
+    );
+  }
   renderEntries([...snapshot.entries].reverse());
   if (!config.ready || !config.address) {
     $('deployment-status').textContent = 'NOT DEPLOYED: deposits and payouts are disabled. There is no Base funding address yet.';
     return;
   }
   if (!window.ethers) throw new Error('Unable to load ethers.js');
-  if (config.chainId !== 8453 || !Number.isSafeInteger(config.deploymentBlock) || config.deploymentBlock < 0) throw new Error('Invalid Base deployment configuration');
+  if (config.chainId !== 8453 || config.address.toLowerCase() !== version.address.toLowerCase() ||
+      !Number.isSafeInteger(config.deploymentBlock) || config.deploymentBlock < 0) throw new Error('Invalid Base deployment configuration');
   reader = new ethers.JsonRpcProvider(config.rpcUrl, 8453, { staticNetwork: true });
   if (Number(BigInt(await reader.send('eth_chainId', []))) !== 8453 || await reader.getCode(config.address) === '0x') throw new Error('Base chain or deployed code verification failed');
   ledger = new ethers.Contract(config.address, abi, reader);
@@ -340,7 +368,7 @@ async function initialize() {
       Number(await ledger.historicalEntries()) !== snapshot.count ||
       Number(await ledger.sourceBlock()) !== snapshot.sourceBlock ||
       await ledger.sourceBlockHash() !== snapshot.sourceBlockHash ||
-      Number(await ledger.sourceChainId()) !== 10 ||
+      Number(await ledger.sourceChainId()) !== version.sourceChainId || snapshot.sourceChainId !== version.sourceChainId ||
       (await ledger.sourceLedger()).toLowerCase() !== snapshot.sourceAddress.toLowerCase()) {
     throw new Error('Base treasury history verification failed. Funding is disabled.');
   }

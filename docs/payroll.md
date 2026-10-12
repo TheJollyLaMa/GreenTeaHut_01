@@ -8,7 +8,8 @@ on-chain payment evidence. Their shared router is **not** used here. Green Tea
 Hut's already deployed treasury pays native Base USDC directly:
 
 - Chain: Base mainnet, `8453`.
-- Treasury: `0x757B1F856f2Faea5a661820f9da56af032B1F9a1`.
+- Treasury: `0xf75d1688D01fE29235B3bde450B615e4f3d2254A` (`ProjectTreasuryV2`, `payPayroll`).
+- Previous Base treasury (retired, no payroll payouts): `0x757B1F856f2Faea5a661820f9da56af032B1F9a1`.
 - USDC: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`, six decimals.
 - Configuration: [payroll-assets.json](../payroll-assets.json).
 - Public queue: [payroll-queue.json](../payroll-queue.json).
@@ -77,13 +78,15 @@ accidental resend during receipt/RPC failures. A refresh releases a reverted
 transaction for retry; unresolved transactions stay blocked. Review replaced
 or dropped transactions manually rather than clearing storage to retry.
 
-**Concurrency limit:** this general-purpose treasury does not enforce unique
-payroll work references on-chain. This UI locks payment operations across tabs
-in the same browser and checks existing payouts, but cannot prevent two managers
-on separate devices, or another direct contract caller, paying concurrently.
-Coordinate a single payroll operator. Duplicate on-chain references halt panel
-payments and require manual review; settlement cannot reuse one payment log.
-An on-chain uniqueness guarantee would require a new contract deployment.
+**On-chain uniqueness:** the panel calls
+`payPayroll(issueId, lowercaseGithub, role, recipient, amountUSDC)` on
+[ProjectTreasuryV2](../contracts/ProjectTreasuryV2.sol). The contract builds the
+canonical `repo-payroll:` reference and rejects a second payout for the same
+issue/contributor/role, even from another device or a direct caller. Generic
+token payouts cannot use the `repo-payroll:` prefix. The panel checks
+`paidPayrollReferences` and simulates the call before asking for confirmation,
+and pays only from `availableUSDC()` (store escrow excluded). Settlement requires
+the matching `FundsPaid`, `PayrollPaid` and USDC `Transfer` logs.
 
 The on-site shift workflow is preserved: its USD accounting and proof
 confirmation do not automatically transfer tokens or use the repo queue.

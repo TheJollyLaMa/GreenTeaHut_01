@@ -27,7 +27,7 @@
       }
     },
     "ProjectTreasuryLedger": {
-      "description": "Green Tea Hut #1 - Base ETH/ERC20 treasury and historical ledger",
+      "description": "Previous Base treasury (V1), retired after migration to ProjectTreasuryV2",
       "abiVersion": "3.0.0",
       "sourceFile": "contracts/ProjectTreasuryLedger.sol",
       "artifactFile": "artifacts/ProjectTreasuryLedger.json",
@@ -38,7 +38,7 @@
         "8453": {
           "chainName": "Base",
           "address": "0x757B1F856f2Faea5a661820f9da56af032B1F9a1",
-          "status": "deployed",
+          "status": "retired",
           "explorerUrl": "https://basescan.org/address/0x757B1F856f2Faea5a661820f9da56af032B1F9a1"
         }
       },
@@ -46,6 +46,32 @@
         "0x7fef036e": "totalEntries()",
         "0xbae78d7b": "getEntry(uint256)",
         "0x8da5cb5b": "owner()"
+      }
+    },
+    "ProjectTreasuryV2": {
+      "description": "Green Tea Hut #1 - active Base treasury, ledger, USDC payroll and storefront",
+      "abiVersion": "4.0.0",
+      "sourceFile": "contracts/ProjectTreasuryV2.sol",
+      "artifactFile": "artifacts/ProjectTreasuryV2.json",
+      "compiler": "solc 0.8.30",
+      "abiFile": "web/treasury-v2-abi.json",
+      "deploymentConfig": "web/base-deployment.json",
+      "networks": {
+        "8453": {
+          "chainName": "Base",
+          "address": "0xf75d1688D01fE29235B3bde450B615e4f3d2254A",
+          "deploymentBlock": 52513179,
+          "status": "active",
+          "explorerUrl": "https://basescan.org/address/0xf75d1688D01fE29235B3bde450B615e4f3d2254A"
+        }
+      },
+      "requiredSelectors": {
+        "0x7fef036e": "totalEntries()",
+        "0xbae78d7b": "getEntry(uint256)",
+        "0x8da5cb5b": "owner()",
+        "0x3eeeecc5": "payPayroll(uint256,string,uint8,address,uint256)",
+        "0x1ea82221": "availableUSDC()",
+        "0x919d241b": "buy(uint256,uint256,uint256,uint256,bytes32)"
       }
     }
   }

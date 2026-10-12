@@ -32,12 +32,29 @@ transfer for the exact wallet, amount, and deterministic work reference.
 Settlement does not send money. See [the payroll guide](docs/payroll.md).
 
 ### Active contract deployment
-- **Contract:** `ProjectTreasuryLedger` (`contracts/ProjectTreasuryLedger.sol`)
-- **Address:** `0x757B1F856f2Faea5a661820f9da56af032B1F9a1`
-- **Network:** Base (Chain ID `8453`)
-- **Explorer:** https://basescan.org/address/0x757B1F856f2Faea5a661820f9da56af032B1F9a1
-- **Verified source:** https://repo.sourcify.dev/8453/0x757B1F856f2Faea5a661820f9da56af032B1F9a1
+- **Contract:** `ProjectTreasuryV2` (`contracts/ProjectTreasuryV2.sol`)
+- **Address:** `0xf75d1688D01fE29235B3bde450B615e4f3d2254A`
+- **Network:** Base (Chain ID `8453`), deployment block `52513179`
+- **Explorer:** https://basescan.org/address/0xf75d1688D01fE29235B3bde450B615e4f3d2254A
+- **Verified source:** https://repo.sourcify.dev/8453/0xf75d1688D01fE29235B3bde450B615e4f3d2254A
 - **Owner:** `0x807061DF657A7697c04045dA7d16D941861cAABc`
+- **Previous Base treasury (retired, history imported):** `0x757B1F856f2Faea5a661820f9da56af032B1F9a1`
+- **Original prototype:** the Optimism ledger described under *Legacy prototype*
+
+### Greenhouse storefront
+
+The new clustered-plant toolbar tab opens a storefront for seeds, starter
+plants, cuttings, and harvest. **Manage greenhouse goods** lets you enter your
+own names, descriptions, USDC prices, stock, pickup instructions, and listing
+visibility now. Demo edits persist only in your browser; samples are clearly
+marked **not for sale** and cannot request token approvals or payments.
+
+The live editor targets the active V2 treasury, which adds stock/orders,
+refundable USDC reserved until buyer-confirmed pickup, and unique payroll work
+references enforced on-chain. The store stays **closed** until the owner lists
+real products and calls `setStoreOpen(true)`. See the
+[storefront guide](docs/storefront.md) for editing, metadata publishing, escrow
+rules, validation, and the required deployment/cutover steps.
 
 ### Run frontend with the live contract
 1. Open the live frontend link above (or serve `/web` locally with any static file server).

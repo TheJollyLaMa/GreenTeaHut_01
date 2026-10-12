@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "compile": "node scripts/compile-treasury.js",
+    "compile:v2": "node scripts/compile-v2.js",
+    "test:storefront": "node --test test/storefront.test.js test/treasury-v2.test.js",
     "test:treasury": "node --test test/treasury.test.js test/migration.test.js",
     "export:optimism": "node scripts/export-optimism.js",
     "prepare:base": "node scripts/prepare-base.js",
@@ -13,6 +15,13 @@
     "smoke:base": "node scripts/smoke-base.js --broadcast",
     "smoke:base:usdc:check": "node scripts/smoke-base.js --usdc",
     "smoke:base:usdc": "node scripts/smoke-base.js --usdc --broadcast",
+    "export:base": "node scripts/export-base.js",
+    "verify:base-snapshot": "node scripts/verify-base-snapshot.js",
+    "prepare:v2": "node scripts/prepare-v2.js",
+    "deploy:v2:check": "node scripts/deploy-v2.js",
+    "deploy:v2": "node scripts/deploy-v2.js --broadcast",
+    "verify:v2-source": "node scripts/verify-v2-source.js",
+    "activate:v2": "node scripts/activate-v2.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {

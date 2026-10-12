@@ -9,20 +9,25 @@ const { sendPayment, scanPayments } = require('../web/repo-payroll');
 const entry = { issueRef: `${config.repository}#123`, contributorGithub: 'TheJollyLaMa',
   contributor: '0x807061DF657A7697c04045dA7d16D941861cAABc',
   amount: '0.000001', currency: 'USDC', role: 'contributor' };
-function fixture(overrides = {}) {
+function fixture(overrides = {}, chain = {}) {
   let sent = 0;
   let args;
   let submitted;
+  let referenceChecks = 0;
+  const payPayroll = async (...values) => {
+    sent += 1; args = values;
+    return { hash: '0x' + 'aa'.repeat(32), wait: async () => ({ mockReceipt: true }) };
+  };
+  payPayroll.staticCall = async () => { if (chain.reverts) throw new Error('execution reverted'); };
   const mockEthers = {
+    keccak256: ethers.keccak256, toUtf8Bytes: ethers.toUtf8Bytes,
     Contract: class {
+      constructor() { this.payPayroll = payPayroll; }
       async owner() { return entry.contributor; }
       async managers() { return false; }
-      async balanceOf() { return 1000000n; }
+      async availableUSDC() { return chain.available ?? 1000000n; }
+      async paidPayrollReferences() { return Boolean(chain.paidAfter && ++referenceChecks >= chain.paidAfter); }
       async decimals() { return 6n; }
-      async payToken(...values) {
-        sent += 1; args = values;
-        return { hash: '0x' + 'aa'.repeat(32), wait: async () => ({ mockReceipt: true }) };
-      }
     },
   };
   const params = { entry, config, core: { ...core, verifyReceipt: () => ({ txHash: '0x' + 'aa'.repeat(32) }) },
@@ -34,12 +39,20 @@ function fixture(overrides = {}) {
   return { params, sent: () => sent, args: () => args, submitted: () => submitted };
 }
 
-test('panel requests an exact USDC treasury payout with deterministic reference, not approval or USD accounting', async () => {
+test('panel calls the unique V2 payroll method with issue, lowercase login, role index and exact USDC', async () => {
   const f = fixture();
   await sendPayment(f.params);
   assert.equal(f.sent(), 1);
-  assert.deepEqual(f.args(), [core.USDC, entry.contributor, 1n, core.paymentReference(entry)]);
+  assert.deepEqual(f.args(), [123n, 'thejollylama', 0, entry.contributor, 1n]);
   assert.ok(f.submitted());
+});
+
+test('no funds sent when the treasury already recorded the reference, escrow leaves too little, or simulation reverts', async () => {
+  for (const chain of [{ paidAfter: 1 }, { paidAfter: 2 }, { available: 0n }, { reverts: true }]) {
+    const f = fixture({}, chain);
+    await assert.rejects(sendPayment(f.params));
+    assert.equal(f.sent(), 0);
+  }
 });
 
 test('no funds sent for unverified deployment, wrong network, unauthorized wallet, duplicate, insufficient funds, or cancelled confirmation', async () => {

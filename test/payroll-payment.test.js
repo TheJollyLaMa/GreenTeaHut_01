@@ -18,12 +18,14 @@ function log(iface, event, values, address, index) {
 }
 function receipt(overrides = {}) {
   return {
-    status: 1, to: core.TREASURY, hash: txHash, blockNumber: 52509000, blockHash,
+    status: 1, to: core.TREASURY, hash: txHash, blockNumber: 52514000, blockHash,
     logs: [
       log(new ethers.Interface(core.PAYMENT_ABI), 'FundsPaid',
         [1, core.USDC, entry.contributor, entry.contributor, 12345678, core.paymentReference(entry)], core.TREASURY, 1),
       log(new ethers.Interface(core.TOKEN_ABI), 'Transfer',
         [core.TREASURY, entry.contributor, 12345678], core.USDC, 2),
+      log(new ethers.Interface(core.PAYMENT_ABI), 'PayrollPaid',
+        [core.workReference(entry, ethers), entry.contributor, 12345678, entry.contributor], core.TREASURY, 3),
     ],
     ...overrides,
   };
@@ -33,7 +35,7 @@ function provider(proof = receipt(), options = {}) {
     send: async () => options.chain || '0x2105',
     getTransactionReceipt: async () => proof,
     getBlock: async tag => tag === 'finalized'
-      ? { number: options.finalized || 52509000 } : { hash: options.blockHash || blockHash },
+      ? { number: options.finalized || 52514000 } : { hash: options.blockHash || blockHash },
   };
 }
 function state() {
@@ -61,7 +63,7 @@ test('settles one exact finalized Base USDC treasury payment and stores unique p
 test('rejects wrong chain, failed, unfinalized, noncanonical and missing receipts without mutating accounting', async () => {
   for (const rpc of [
     provider(receipt(), { chain: '0xa' }), provider(null),
-    provider(receipt({ status: 0 })), provider(receipt(), { finalized: 52508999 }),
+    provider(receipt({ status: 0 })), provider(receipt(), { finalized: 52513999 }),
     provider(receipt(), { blockHash: '0x' + 'ff'.repeat(32) }),
   ]) {
     const data = state();
@@ -73,7 +75,7 @@ test('rejects wrong chain, failed, unfinalized, noncanonical and missing receipt
   }
 });
 
-test('requires exact asset, sender, recipient, amount, role, work reference and both event types', () => {
+test('requires exact asset, sender, recipient, amount, role, unique work reference and all event types', () => {
   const verify = (candidate = entry, proof = receipt()) =>
     core.verifyReceipt({ entry: candidate, config, receipt: proof, ethers });
   for (const change of [
@@ -82,7 +84,8 @@ test('requires exact asset, sender, recipient, amount, role, work reference and 
   ]) assert.throws(() => verify({ ...entry, ...change }), /exact treasury/);
   assert.throws(() => verify(entry, receipt({ to: entry.contributor })), /project treasury/);
   const good = receipt();
-  for (const logs of [good.logs.slice(0, 1), good.logs.slice(1), [...good.logs, good.logs[0]],
+  for (const logs of [good.logs.slice(0, 1), good.logs.slice(1), good.logs.slice(0, 2), [...good.logs, good.logs[2]],
+    [...good.logs, good.logs[0]],
     good.logs.map(item => ({ ...item, address: entry.contributor }))]) {
     assert.throws(() => verify(entry, receipt({ logs })), /exact treasury/);
   }
@@ -94,6 +97,20 @@ test('requires exact asset, sender, recipient, amount, role, work reference and 
   fakeSender.logs[1] = log(new ethers.Interface(core.TOKEN_ABI), 'Transfer',
     [entry.contributor, entry.contributor, 12345678], core.USDC, 2);
   assert.throws(() => verify(entry, fakeSender), /exact treasury/);
+  const otherWork = receipt();
+  otherWork.logs[2] = log(new ethers.Interface(core.PAYMENT_ABI), 'PayrollPaid',
+    [ethers.id('repo-payroll:other'), entry.contributor, 12345678, entry.contributor], core.TREASURY, 3);
+  assert.throws(() => verify(entry, otherWork), /exact treasury/);
+});
+
+test('payroll call arguments rebuild the on-chain V2 work reference', () => {
+  const call = core.payrollCall({ ...entry, role: 'idea-originator' });
+  assert.deepEqual(call, { issueId: 123n, contributorGithub: 'thejollylama', role: 2,
+    recipient: entry.contributor, amount: 12345678n });
+  assert.equal(core.workReference(entry, ethers),
+    ethers.id('repo-payroll:TheJollyLaMa/GreenTeaHut_01#123:thejollylama:contributor:USDC'));
+  assert.throws(() => core.payrollCall({ ...entry, contributorGithub: 'a'.repeat(40) }), /Invalid repository/);
+  assert.equal(core.validAddress(core.PREVIOUS_TREASURY), false);
 });
 
 module.exports = { entry, receipt, provider, state };
