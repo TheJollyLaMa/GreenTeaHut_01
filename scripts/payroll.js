@@ -1,9 +1,9 @@
-const BOUNTY_LABEL_RE = /^bounty:\s*((?:0|[1-9]\d*)(?:\.\d+)?)\s*(?:\$ART|ART)$/i;
-const TEST_BOUNTY_LABEL_RE = /^test-bounty:\s*((?:0|[1-9]\d*)(?:\.\d+)?)\s*(?:\$ART|ART)$/i;
+const { amountUnits, formatUnits, validAddress, entryKey } = require('../web/payroll-core');
+const BOUNTY_LABEL_RE = /^bounty:\s*((?:0|[1-9]\d*)(?:\.\d+)?)\s*\$?USDC$/i;
+const TEST_BOUNTY_LABEL_RE = /^test-bounty:\s*((?:0|[1-9]\d*)(?:\.\d+)?)\s*\$?USDC$/i;
 const IDEA_CREDIT_LABEL_RE = /^idea-credit:\s*@?([-\w]+)$/i;
-const CLOSING_ISSUE_RE = /(?:closes?|fixes?|resolves?)\s+(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#(\d+)/gi;
-const TITLE_ISSUE_RE = /#(\d+)/g;
-const AMOUNT_RE = /^\d+(?:\.\d+)?$/;
+const CLOSING_ISSUE_RE = /(?:closes?|fixes?|resolves?)\s+(?:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+))?#(\d+)/gi;
+const TITLE_ISSUE_RE = /(?:^|[\s(])#(\d+)\b/g;
 
 const CONTRIBUTOR_ALIASES = {
   'copilot-swe-agent': 'copilot',
@@ -20,21 +20,18 @@ function labelNames(issue) {
 }
 
 function normalizeAmount(value) {
-  const input = String(value).trim();
-  if (!AMOUNT_RE.test(input)) throw new Error(`Invalid payout amount: ${value}`);
-  let [whole, fraction = ''] = input.split('.');
-  whole = whole.replace(/^0+(?=\d)/, '');
-  fraction = fraction.replace(/0+$/, '');
-  if (BigInt(`${whole}${fraction}` || '0') <= 0n) throw new Error(`Invalid payout amount: ${value}`);
-  return fraction ? `${whole}.${fraction}` : whole;
+  return formatUnits(amountUnits(String(value).trim()));
 }
 
 function parseAmountLabel(issue, pattern = BOUNTY_LABEL_RE) {
+  let result = null;
   for (const label of labelNames(issue)) {
     const match = String(label || '').match(pattern);
-    if (match && Number(match[1]) > 0) return { label, amount: normalizeAmount(match[1]) };
+    if (!match) continue;
+    if (result) throw new Error('Issue has more than one USDC bounty label');
+    result = { label, amount: normalizeAmount(match[1]), currency: 'USDC' };
   }
-  return null;
+  return result;
 }
 
 function parseIdeaCredit(issue) {
@@ -45,13 +42,15 @@ function parseIdeaCredit(issue) {
   return null;
 }
 
-function extractIssueNumbers({ body = '', title = '', linked = [], override = [] } = {}) {
+function extractIssueNumbers({ body = '', title = '', linked = [], override = [], repoSlug = 'TheJollyLaMa/GreenTeaHut_01' } = {}) {
   const numbers = new Set();
   for (const value of override) {
     const number = Number(value);
     if (Number.isInteger(number) && number > 0) numbers.add(number);
   }
-  for (const match of String(body).matchAll(CLOSING_ISSUE_RE)) numbers.add(Number(match[1]));
+  for (const match of String(body).matchAll(CLOSING_ISSUE_RE)) {
+    if (!match[1] || match[1].toLowerCase() === repoSlug.toLowerCase()) numbers.add(Number(match[2]));
+  }
   for (const match of String(title).matchAll(TITLE_ISSUE_RE)) numbers.add(Number(match[1]));
   for (const value of linked) {
     const number = Number(value);
@@ -60,29 +59,13 @@ function extractIssueNumbers({ body = '', title = '', linked = [], override = []
   return [...numbers];
 }
 
-function decimalParts(value) {
-  const normalized = normalizeAmount(value);
-  const [whole, fraction = ''] = normalized.split('.');
-  return { units: BigInt(`${whole}${fraction}`), scale: fraction.length };
-}
-
-function formatDecimal(units, scale) {
-  const digits = units.toString().padStart(scale + 1, '0');
-  if (scale === 0) return digits;
-  return normalizeAmount(`${digits.slice(0, -scale)}.${digits.slice(-scale)}`);
-}
-
 function splitIdeaCredit(amount) {
-  let { units, scale } = decimalParts(amount);
-  while (units % 5n !== 0n && scale < 18) {
-    units *= 10n;
-    scale += 1;
-  }
-  if (units % 5n !== 0n) throw new Error(`Payout amount cannot be split exactly at 18 decimals: ${amount}`);
+  const units = amountUnits(normalizeAmount(amount));
+  if (units % 5n !== 0n) throw new Error(`Payout amount cannot be split exactly at six USDC decimals: ${amount}`);
   const originatorUnits = units / 5n;
   return {
-    implementer: formatDecimal(units - originatorUnits, scale),
-    originator: formatDecimal(originatorUnits, scale),
+    implementer: formatUnits(units - originatorUnits),
+    originator: formatUnits(originatorUnits),
   };
 }
 
@@ -96,29 +79,13 @@ function findAccount(accounts, login) {
 function requireWhitelistedAccount(accounts, candidates, description) {
   for (const login of candidates) {
     const account = findAccount(accounts, login);
-    if (account && String(account.walletAddress || '').trim()) return account;
+    if (account && validAddress(account.walletAddress)) return account;
   }
   throw new Error(`No whitelisted wallet found for ${description}: ${candidates.filter(Boolean).join(', ') || 'none'}`);
 }
 
-function entryRole(entry) {
-  return String(entry.role || 'contributor').toLowerCase();
-}
-
 function isDuplicate(queue, candidate) {
-  const candidateIssueRef = String(candidate.issueRef || '').trim();
-  const candidateGithub = String(candidate.contributorGithub || '').trim().toLowerCase();
-  const candidateRole = entryRole(candidate);
-
-  return [...(queue.pending || []), ...(queue.settled || [])].some(entry => {
-    if (String(entry.issueRef || '').trim() !== candidateIssueRef) return false;
-    const entryGithub = String(entry.contributorGithub || '').trim().toLowerCase();
-    const entryRoleName = entryRole(entry);
-    if (entryGithub === candidateGithub) return true;
-    if (candidateRole === 'contributor') return false;
-    return (entryRoleName === 'implementer' || entryRoleName === 'idea-originator') &&
-      (candidateRole === 'implementer' || candidateRole === 'idea-originator');
-  });
+  return [...queue.pending, ...queue.settled].some(entry => entryKey(entry) === entryKey(candidate));
 }
 
 function pickWhitelistedTester({ assigneeLogins = [], accounts, commenter = '' } = {}) {
@@ -126,7 +93,7 @@ function pickWhitelistedTester({ assigneeLogins = [], accounts, commenter = '' }
     .map(login => normalizeLogin(login))
     .filter(Boolean)
     .map(login => findAccount(accounts, login))
-    .filter(account => account && String(account.walletAddress || '').trim());
+    .filter(account => account && validAddress(account.walletAddress));
 
   if (eligible.length === 0) throw new Error('No assigned tester on this issue has a whitelisted wallet.');
   const commenterKey = normalizeLogin(commenter).toLowerCase();
@@ -150,7 +117,7 @@ function createBountyEntries({ issue, pr, accounts, queue, repoSlug, queuedAt, q
   const implementer = requireWhitelistedAccount(accounts, candidates, 'PR author or issue assignee');
   const ideaOriginatorLogin = parseIdeaCredit(issue);
   const issueRef = `${repoSlug}#${issue.number}`;
-  const common = { issueRef, currency: 'ART', queuedAt, queuedBy, prNumber: pr.number };
+  const common = { issueRef, currency: 'USDC', queuedAt, queuedBy, prNumber: pr.number };
 
   let entries;
   if (ideaOriginatorLogin) {
@@ -166,6 +133,7 @@ function createBountyEntries({ issue, pr, accounts, queue, repoSlug, queuedAt, q
       contributor: implementer.walletAddress,
       contributorGithub: implementer.github,
       amount: bounty.amount,
+      role: 'contributor',
     }];
   }
 
@@ -180,8 +148,8 @@ function createBountyEntries({ issue, pr, accounts, queue, repoSlug, queuedAt, q
 function applyAccountAccrual(accounts, entries) {
   for (const entry of entries) {
     const account = findAccount(accounts, entry.contributorGithub);
-    if (!account) continue;
-    account.artPending = Number(((Number(account.artPending) || 0) + Number(entry.amount)).toFixed(8));
+    if (!account) throw new Error(`Unregistered contributor: ${entry.contributorGithub}`);
+    account.usdcPending = formatUnits(amountUnits(account.usdcPending, true) + amountUnits(entry.amount));
     if (!Array.isArray(account.issuesClosed)) account.issuesClosed = [];
     if (!account.issuesClosed.includes(entry.issueRef)) account.issuesClosed.push(entry.issueRef);
     if (entry.role === 'idea-originator') {
@@ -191,30 +159,26 @@ function applyAccountAccrual(accounts, entries) {
   }
 }
 
-function settleEntries({ queue, accounts, contributorGithub = '', issueRef = '', txHash = '', settledAt, settledBy }) {
-  const contributorFilter = String(contributorGithub).trim().toLowerCase();
-  const issueFilter = String(issueRef).trim();
-  const matches = entry =>
-    (!contributorFilter || String(entry.contributorGithub || '').trim().toLowerCase() === contributorFilter) &&
-    (!issueFilter || String(entry.issueRef || '').trim() === issueFilter);
-  const selected = (queue.pending || []).filter(matches);
-  queue.pending = (queue.pending || []).filter(entry => !matches(entry));
-  const settled = selected.map(entry => ({
-    ...entry,
-    settledAt,
-    settledBy,
-    ...(txHash ? { txHash } : {}),
-  }));
-  if (!Array.isArray(queue.settled)) queue.settled = [];
-  queue.settled.push(...settled);
-
-  for (const entry of settled) {
-    const account = findAccount(accounts, entry.contributorGithub);
-    if (!account) continue;
-    account.artPending = Number(Math.max(0, (Number(account.artPending) || 0) - Number(entry.amount)).toFixed(8));
-    account.artEarned = Number(((Number(account.artEarned) || 0) + Number(entry.amount)).toFixed(8));
+function settleEntries({ queue, accounts, entry, proof, settledAt, settledBy }) {
+  const key = entryKey(entry);
+  const selected = queue.pending.filter(candidate => entryKey(candidate) === key);
+  if (selected.length !== 1) throw new Error('Exactly one pending entry must match settlement');
+  if (!/^0x[0-9a-f]{64}$/i.test(proof?.txHash || '') || !Number.isSafeInteger(proof.paymentLogIndex)) {
+    throw new Error('Verified payment proof is required');
   }
-  return settled;
+  if (queue.settled.some(item => item.txHash.toLowerCase() === proof.txHash.toLowerCase() &&
+      item.paymentLogIndex === proof.paymentLogIndex)) throw new Error('Payment proof already used');
+  const account = findAccount(accounts, entry.contributorGithub);
+  if (!account) throw new Error('Unregistered settlement recipient');
+  const pending = amountUnits(account.usdcPending, true) - amountUnits(entry.amount);
+  if (pending < 0n) throw new Error('USDC pending balance is insufficient');
+  const earned = amountUnits(account.usdcEarned, true) + amountUnits(entry.amount);
+  const settled = { ...selected[0], ...proof, settledAt, settledBy };
+  queue.pending = queue.pending.filter(candidate => entryKey(candidate) !== key);
+  queue.settled.push(settled);
+  account.usdcPending = formatUnits(pending);
+  account.usdcEarned = formatUnits(earned);
+  return [settled];
 }
 
 module.exports = {

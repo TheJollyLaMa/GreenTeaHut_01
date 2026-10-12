@@ -21,7 +21,7 @@ body:
     id: wallet
     attributes:
       label: Wallet address
-      description: Ethereum wallet address for ART payouts
+      description: EVM wallet address you control on Base for native USDC payouts
       placeholder: 0x...
     validations:
       required: true

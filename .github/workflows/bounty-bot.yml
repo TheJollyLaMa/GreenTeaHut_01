@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: Closed or merged PR number to recover
+        description: Merged PR number to recover
         required: true
         type: string
       issue_number:
-        description: Optional comma-separated issue numbers for manual recovery
+        description: Optional comma-separated local issue numbers for manual recovery
         required: false
         type: string
 
@@ -28,34 +28,23 @@ jobs:
       group: green-tea-hut-payroll-queue
       cancel-in-progress: false
     steps:
-      - name: Checkout main
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config --global credential.helper store
-          printf 'https://x-access-token:%s@github.com\n' "$GH_TOKEN" > "$HOME/.git-credentials"
-          chmod 600 "$HOME/.git-credentials"
-          git init .
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth=1 origin main
-          git checkout -B main FETCH_HEAD
-
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - name: Queue merged PR payout
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number }}
           INPUT_ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
         run: node scripts/processMergedBounty.js
-
       - name: Validate updated queue
         run: node scripts/validatePayrollQueue.js
-
       - name: Commit queue update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add payroll-queue.json contributor-accounts.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "chore: queue ART payroll entries"
-          git pull --rebase origin main
+          git commit -m "chore: queue Base USDC payroll entries"
           git push origin HEAD:main

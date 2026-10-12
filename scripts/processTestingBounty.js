@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const { renderArtFiComment } = require('./commentArt');
+const { renderPayrollComment } = require('./commentArt');
+const { validateData } = require('../web/payroll-core');
+const config = require('../payroll-assets.json');
 const { githubRequest, postIssueComment, repositoryCoordinates } = require('./githubApi');
 const {
   TEST_BOUNTY_LABEL_RE,
@@ -25,7 +27,7 @@ function writeJson(filePath, value) {
 }
 
 function buildTestingComment(message, issueNumber, commentType) {
-  return renderArtFiComment(message, issueNumber, commentType);
+  return renderPayrollComment(message, issueNumber, commentType);
 }
 
 async function main() {
@@ -38,12 +40,12 @@ async function main() {
   const bounty = parseAmountLabel(issue, TEST_BOUNTY_LABEL_RE);
 
   if (!bounty) {
-    console.log(`Issue #${issueNumber} has no label matching "test-bounty: <amount> ART".`);
+    console.log(`Issue #${issueNumber} has no label matching "test-bounty: <amount> USDC".`);
     return;
   }
 
   const assigneeLogins = (issue.assignees || []).map(assignee => normalizeLogin(assignee.login));
-  if (comment.startsWith('/test-complete')) {
+  if (/^\/test-complete(?:\s|$)/.test(comment)) {
     if (!assigneeLogins.some(login => login.toLowerCase() === commenter.toLowerCase())) {
       await postIssueComment(owner, repo, issueNumber, buildTestingComment('⚠️ Only assigned testers can use `/test-complete`.', issueNumber, 'test-rejected'));
       return;
@@ -56,12 +58,10 @@ async function main() {
     return;
   }
 
-  if (!comment.startsWith('/test-approved')) return;
+  if (!/^\/test-approved(?:\s|$)/.test(comment)) return;
   const queue = readJson(QUEUE_PATH);
   const accounts = readJson(ACCOUNTS_PATH);
-  if (!Array.isArray(queue.pending)) queue.pending = [];
-  if (!Array.isArray(queue.settled)) queue.settled = [];
-  if (!Array.isArray(accounts.contributors)) accounts.contributors = [];
+  validateData(queue, accounts, config);
   const payrollOwner = accounts.contributors.find(account => account.role === 'owner');
   if (!payrollOwner || commenter.toLowerCase() !== String(payrollOwner.github).toLowerCase()) {
     await postIssueComment(owner, repo, issueNumber, buildTestingComment('⚠️ Only the repository owner can approve testing payouts.', issueNumber, 'test-rejected'));
@@ -74,7 +74,7 @@ async function main() {
     contributor: tester.walletAddress,
     contributorGithub: tester.github,
     amount: bounty.amount,
-    currency: 'ART',
+    currency: 'USDC',
     role: 'tester',
     queuedAt: new Date().toISOString(),
     queuedBy: process.env.GITHUB_ACTOR || commenter,
@@ -86,10 +86,11 @@ async function main() {
 
   queue.pending.push(entry);
   applyAccountAccrual(accounts, [entry]);
+  validateData(queue, accounts, config);
   writeJson(QUEUE_PATH, queue);
   writeJson(ACCOUNTS_PATH, accounts);
   await postIssueComment(owner, repo, issueNumber, buildTestingComment(
-    `✅ Queued ${entry.amount} ART testing bounty for @${entry.contributorGithub}, pending administrator settlement.`,
+    `✅ Queued ${entry.amount} USDC on Base testing bounty for @${entry.contributorGithub}, pending authorized treasury payout and verified settlement.`,
     issueNumber,
     'test-approved'
   ));

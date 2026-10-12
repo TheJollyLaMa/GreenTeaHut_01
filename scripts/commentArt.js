@@ -1,5 +1,4 @@
 const PROJECT_LOGO_URL = 'https://raw.githubusercontent.com/TheJollyLaMa/GreenTeaHut_01/main/web/assets/images/green-tea-party-hut.png';
-const ENS_ETH_LOGO_URL = 'https://raw.githubusercontent.com/TheJollyLaMa/ArtFi/main/Ens_Eth_Breathe.gif';
 
 const SCENES = [
   ['Creator workshop', '🌌', '🟪', '🧑‍🎨', '🛠️', '✨'],
@@ -62,7 +61,7 @@ function selectArtwork(issueNumber, commentType) {
 
 function renderCell(cell) {
   if (cell === '🟢') return `<td align="center"><img src="${PROJECT_LOGO_URL}" alt="Green Tea Hut logo" width="24"></td>`;
-  if (cell === '💠') return `<td align="center"><img src="${ENS_ETH_LOGO_URL}" alt="ENS and Ethereum logo" width="24"></td>`;
+  if (cell === '💠') return '<td align="center" title="Base USDC">💠</td>';
   return `<td align="center">${cell}</td>`;
 }
 
@@ -71,17 +70,16 @@ function renderArtworkTable(artwork) {
   return `<table><tbody>\n${rows}\n</tbody></table>`;
 }
 
-function renderArtFiComment(body, issueNumber, commentType) {
+function renderPayrollComment(body, issueNumber, commentType) {
   const artwork = selectArtwork(issueNumber, commentType);
   return [body, '', `<strong>${artwork.name}</strong>`, renderArtworkTable(artwork)].join('\n');
 }
 
 module.exports = {
   ARTWORKS,
-  ENS_ETH_LOGO_URL,
   PROJECT_LOGO_URL,
   artworkIndex,
-  renderArtFiComment,
+  renderPayrollComment,
   renderArtworkTable,
   selectArtwork,
 };

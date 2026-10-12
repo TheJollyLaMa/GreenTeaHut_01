@@ -7,7 +7,7 @@ The public ledger tracks project funds moving in and out of Green Tea Hut #1. Ea
 
 | Status | Description |
 |---|---|
-| **PENDING** | Soft incoming entry — expected inflow announced but not yet verified (e.g. Artizen match accrual, pledge). Amount may be revised before settlement. |
+| **PENDING** | Soft incoming entry — expected inflow announced but not yet verified (e.g. a pledge). Amount may be revised before settlement. |
 | **REQUESTED** | Soft outgoing entry — expected outflow requested but not yet approved or executed (e.g. labor or materials request). Amount may be revised before settlement. |
 | **COMMITTED** | Approved and awaiting execution — funds or work authorized but not yet transferred. Amount may still be revised. |
 | **CONFIRMED** | Finalized — verified and recorded with supporting proof (receipt, bank statement, or on-chain transaction link). No further revisions allowed. |

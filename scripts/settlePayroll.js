@@ -1,9 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const { renderArtFiComment } = require('./commentArt');
+const { renderPayrollComment } = require('./commentArt');
 const { postIssueComment, repositoryCoordinates } = require('./githubApi');
 const { settleEntries } = require('./payroll');
+const { entryKey, validateData, verifyPayment } = require('../web/payroll-core');
+const config = require('../payroll-assets.json');
 
 const ROOT = path.resolve(__dirname, '..');
 const QUEUE_PATH = path.join(ROOT, 'payroll-queue.json');
@@ -19,10 +21,23 @@ function writeJson(filePath, value) {
 
 function buildSettlementComment({ settledCount, actor, txHash, issueNumber }) {
   const body = [
-    `✅ Settled ${settledCount} payroll entr${settledCount === 1 ? 'y' : 'ies'} by @${actor}.`,
-    txHash ? `🔗 Tx: ${txHash}` : '',
+    `✅ Settled ${settledCount} USDC payroll entr${settledCount === 1 ? 'y' : 'ies'} by @${actor}.`,
+    `🔗 Base payout: https://basescan.org/tx/${txHash}`,
   ].filter(Boolean).join('\n');
-  return renderArtFiComment(body, issueNumber, 'settlement');
+  return renderPayrollComment(body, issueNumber, 'settlement');
+}
+
+async function settleVerifiedPayment({ queue, accounts, contributorGithub, issueRef, role, txHash,
+  provider, ethers, settledAt, settledBy }) {
+  validateData(queue, accounts, config);
+  const key = entryKey({ contributorGithub, issueRef, role, currency: 'USDC' });
+  const selected = queue.pending.filter(entry => entryKey(entry) === key);
+  if (selected.length !== 1) throw new Error('Exactly one pending payroll entry must match contributor, issue, and role');
+  const entry = selected[0];
+  const proof = await verifyPayment({ entry, config, txHash, provider, ethers });
+  const settled = settleEntries({ queue, accounts, entry, proof, settledAt, settledBy });
+  validateData(queue, accounts, config);
+  return settled;
 }
 
 async function main() {
@@ -30,22 +45,25 @@ async function main() {
   const contributorGithub = String(process.env.INPUT_CONTRIBUTOR_GITHUB || '').trim();
   const issueRef = String(process.env.INPUT_ISSUE_REF || '').trim();
   const txHash = String(process.env.INPUT_TX_HASH || '').trim();
+  const role = String(process.env.INPUT_ROLE || '').trim();
+  if (!contributorGithub || !issueRef || !role || !txHash) throw new Error('Contributor, issue, role and confirmed Base payout hash are required');
   const queue = readJson(QUEUE_PATH);
   const accounts = readJson(ACCOUNTS_PATH);
-  const settled = settleEntries({
+  const ethers = require('ethers');
+  const provider = new ethers.JsonRpcProvider(config.rpcUrl, 8453, { staticNetwork: true });
+  const settled = await settleVerifiedPayment({
     queue,
     accounts,
     contributorGithub,
     issueRef,
+    role,
     txHash,
+    provider,
+    ethers,
     settledAt: new Date().toISOString(),
     settledBy: process.env.GITHUB_ACTOR || 'github-actions[bot]',
   });
 
-  if (settled.length === 0) {
-    console.log('No matching pending entries found.');
-    return;
-  }
   writeJson(QUEUE_PATH, queue);
   writeJson(ACCOUNTS_PATH, accounts);
 
@@ -69,4 +87,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { buildSettlementComment };
+module.exports = { buildSettlementComment, settleVerifiedPayment };

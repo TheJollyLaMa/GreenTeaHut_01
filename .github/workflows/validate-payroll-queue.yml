@@ -6,18 +6,24 @@ on:
     paths:
       - payroll-queue.json
       - contributor-accounts.json
+      - payroll-assets.json
+      - package*.json
+      - web/payroll-core.js
+      - web/repo-payroll.js
       - scripts/**
-      - test/payroll.test.js
-      - test/commentArt.test.js
+      - test/**
       - .github/workflows/**
   pull_request:
     branches: [main]
     paths:
       - payroll-queue.json
       - contributor-accounts.json
+      - payroll-assets.json
+      - package*.json
+      - web/payroll-core.js
+      - web/repo-payroll.js
       - scripts/**
-      - test/payroll.test.js
-      - test/commentArt.test.js
+      - test/**
       - .github/workflows/**
 
 permissions:
@@ -30,15 +36,15 @@ jobs:
       group: green-tea-hut-payroll-validation-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - name: Checkout requested revision
-        run: |
-          git init .
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --depth=1 origin "$GITHUB_REF"
-          git checkout --detach FETCH_HEAD
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
 
       - name: Validate payroll queue
         run: node scripts/validatePayrollQueue.js
 
       - name: Test payroll automation
-        run: node --test test/payroll.test.js test/commentArt.test.js
+        run: node --test test/payroll.test.js test/commentArt.test.js test/payroll-payment.test.js test/repo-payroll.test.js test/payroll-integration.test.js

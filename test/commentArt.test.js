@@ -3,10 +3,9 @@ const assert = require('node:assert/strict');
 
 const {
   ARTWORKS,
-  ENS_ETH_LOGO_URL,
   PROJECT_LOGO_URL,
   artworkIndex,
-  renderArtFiComment,
+  renderPayrollComment,
   renderArtworkTable,
   selectArtwork,
 } = require('../scripts/commentArt');
@@ -35,12 +34,12 @@ test('selection is deterministic and rotates through all scenes', () => {
   assert.equal(selected.size, 25);
 });
 
-test('renders both committed assets as cells with alt text and no dropdown', () => {
-  const rendered = renderArtFiComment('✅ Queued 25 ART.', 30, 'merged-payroll');
+test('renders the project logo and Base USDC cells without external partner branding', () => {
+  const rendered = renderPayrollComment('✅ Queued 25 USDC.', 30, 'merged-payroll');
   assert.match(rendered, new RegExp(PROJECT_LOGO_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.match(rendered, new RegExp(ENS_ETH_LOGO_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(rendered, /alt="Green Tea Hut logo"/);
-  assert.match(rendered, /alt="ENS and Ethereum logo"/);
+  assert.match(rendered, /title="Base USDC"/);
+  assert.doesNotMatch(rendered, /ArtFi|Artizen|25 ART/);
   assert.doesNotMatch(rendered, /<details>|<summary>|```/);
   const table = renderArtworkTable(selectArtwork(30, 'merged-payroll'));
   assert.equal((table.match(/<tr>/g) || []).length, 10);
@@ -61,10 +60,10 @@ test('production comments retain their message and visible branded art', () => {
 
   assert.match(comments[0], /Payroll queued from merged PR #32/);
   assert.match(comments[1], /Testing payout queued/);
-  assert.match(comments[2], /Settled 2 payroll entries/);
+  assert.match(comments[2], /Settled 2 USDC payroll entries/);
   for (const comment of comments) {
     assert.match(comment, /Green Tea Hut logo/);
-    assert.match(comment, /ENS and Ethereum logo/);
+    assert.match(comment, /Base USDC/);
     assert.doesNotMatch(comment, /<details>|<summary>/);
   }
 });

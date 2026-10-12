@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 const { applyAccountAccrual, createBountyEntries, extractIssueNumbers } = require('./payroll');
-const { renderArtFiComment } = require('./commentArt');
+const { renderPayrollComment } = require('./commentArt');
+const { validateData } = require('../web/payroll-core');
+const config = require('../payroll-assets.json');
 const { githubRequest, postIssueComment, repositoryCoordinates } = require('./githubApi');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -19,14 +21,14 @@ function writeJson(filePath, value) {
 
 function buildMergedPayrollComment({ entries, isManual, prNumber, issueNumber }) {
   const lines = entries.map(entry =>
-    `- **${entry.amount} ART** to @${entry.contributorGithub}${entry.role ? ` (${entry.role})` : ''}`
+    `- **${entry.amount} USDC on Base** to @${entry.contributorGithub}${entry.role ? ` (${entry.role})` : ''}`
   );
-  return renderArtFiComment([
+  return renderPayrollComment([
     `✅ Payroll queued from ${isManual ? 'manual recovery for' : 'merged'} PR #${prNumber}:`,
     '',
     ...lines,
     '',
-    'The entries are pending administrator spot-check and settlement.',
+    'The entries await an authorized project treasury payout and verified settlement. A bounty is not a funded guarantee.',
   ].join('\n'), issueNumber, 'merged-payroll');
 }
 
@@ -37,14 +39,16 @@ async function linkedIssueNumbers(owner, repo, prNumber) {
     body: JSON.stringify({
       query: `query($owner: String!, $repo: String!, $pr: Int!) {
         repository(owner: $owner, name: $repo) {
-          pullRequest(number: $pr) { closingIssuesReferences(first: 50) { nodes { number } } }
+          pullRequest(number: $pr) { closingIssuesReferences(first: 50) { nodes { number repository { nameWithOwner } } } }
         }
       }`,
       variables: { owner, repo, pr: prNumber },
     }),
   });
   if (data.errors) throw new Error(`GitHub GraphQL failed: ${JSON.stringify(data.errors)}`);
-  return data.data.repository.pullRequest.closingIssuesReferences.nodes.map(node => node.number);
+  return data.data.repository.pullRequest.closingIssuesReferences.nodes
+    .filter(node => node.repository.nameWithOwner.toLowerCase() === `${owner}/${repo}`.toLowerCase())
+    .map(node => node.number);
 }
 
 async function main() {
@@ -58,7 +62,7 @@ async function main() {
     : null);
 
   if (!pr) throw new Error('A pull request payload or pr_number input is required');
-  if (!isManual && !pr.merged) {
+  if (!pr.merged) {
     console.log(`PR #${pr.number} was closed without merge; no payout was queued.`);
     return;
   }
@@ -70,7 +74,8 @@ async function main() {
     console.warn(`Could not load GitHub-linked closing issues: ${error.message}`);
   }
 
-  const issueNumbers = extractIssueNumbers({ body: pr.body || '', title: pr.title || '', linked, override: manualIssueNumbers });
+  const issueNumbers = extractIssueNumbers({ body: pr.body || '', title: pr.title || '', linked,
+    override: manualIssueNumbers, repoSlug: `${owner}/${repo}` });
   if (issueNumbers.length === 0) {
     console.log(`PR #${pr.number} has no issue references in its body, title, or GitHub closing links.`);
     return;
@@ -78,9 +83,7 @@ async function main() {
 
   const queue = readJson(QUEUE_PATH);
   const accounts = readJson(ACCOUNTS_PATH);
-  if (!Array.isArray(queue.pending)) queue.pending = [];
-  if (!Array.isArray(queue.settled)) queue.settled = [];
-  if (!Array.isArray(accounts.contributors)) accounts.contributors = [];
+  validateData(queue, accounts, config);
 
   const planned = [];
   const results = [];
@@ -100,7 +103,7 @@ async function main() {
       queuedBy: process.env.GITHUB_ACTOR || 'github-actions[bot]',
     });
     if (result.reason === 'missing-bounty-label') {
-      console.log(`Skipping issue #${issueNumber}: no label matching "bounty: <amount> ART".`);
+      console.log(`Skipping issue #${issueNumber}: no label matching "bounty: <amount> USDC".`);
       continue;
     }
     if (isManual) result.entries.forEach(entry => { entry.retroactive = true; });
@@ -115,6 +118,7 @@ async function main() {
 
   queue.pending.push(...planned);
   applyAccountAccrual(accounts, planned);
+  validateData(queue, accounts, config);
   writeJson(QUEUE_PATH, queue);
   writeJson(ACCOUNTS_PATH, accounts);
 
