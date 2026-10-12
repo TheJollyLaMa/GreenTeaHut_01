@@ -31,7 +31,7 @@ assert(htmlSource.includes('id="toolbar-payout"'), 'Toolbar still points to the 
 assert(htmlSource.includes('id="payout-view"'), 'Existing payout view container remains in use');
 assert(htmlSource.includes('id="payout-clock-in-form"'), 'Payout view now includes QR clock-in controls');
 assert(htmlSource.includes('id="payout-review-form"'), 'Payout view now includes reviewer settlement controls');
-assert(htmlSource.includes('Payments are recorded here; transfer is executed externally in MVP.'), 'Payout UI explains that MVP transfers are external');
+assert(htmlSource.includes('Confirmation here records proof only and does not send funds.'), 'Payout UI distinguishes accounting confirmation from treasury execution');
 assert(htmlSource.includes('COMMITTED</code> = approved, awaiting transfer.'), 'Payout UI defines COMMITTED as approved and awaiting transfer');
 assert(htmlSource.includes('CONFIRMED</code> = transfer completed + proof attached.'), 'Payout UI defines CONFIRMED as transfer completed with proof');
 
@@ -56,10 +56,10 @@ assert(appSource.includes('confirmEntry(shift.ledgerEntryId, proofUrl)'), 'Settl
 assert(appSource.includes("confirmButton.textContent = 'Confirm Transfer'"), 'Ledger actions use transfer confirmation wording');
 assert(appSource.includes('Awaiting proof'), 'Unconfirmed payout records avoid paid/settled wording before proof exists');
 
-console.log('\n=== 5. Public documentation names Option 1 and Option 2 ===');
-assert(readmeSource.includes('Option 1 — recommended for this MVP'), 'README recommends Option 1');
-assert(readmeSource.includes('Option 2 — future upgrade path'), 'README documents Option 2');
-assert(readmeSource.includes('no contract or ABI changes are required'), 'README states that this MVP does not require a deploy');
+console.log('\n=== 5. Public documentation describes the Base cutover ===');
+assert(readmeSource.includes('Base (Chain ID `8453`)'), 'README names active Base deployment');
+assert(readmeSource.includes('Legacy prototype'), 'README identifies OP as the legacy prototype');
+assert(readmeSource.includes('Accounting confirmation itself does not move funds'), 'README distinguishes accounting from money movement');
 assert(readmeSource.includes('COMMITTED` (approved, awaiting transfer)'), 'README documents COMMITTED as approved and awaiting transfer');
 assert(readmeSource.includes('CONFIRMED` (transfer completed + proof attached)'), 'README documents CONFIRMED as transfer completed with proof');
 

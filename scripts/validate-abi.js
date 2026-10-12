@@ -91,12 +91,14 @@ function main() {
   console.log(`app.js → chainId: ${appChainId}, address: ${appAddress}`);
 
   const contracts = metadata.contracts || {};
+  let matchedNetwork = false;
   for (const contractName of Object.keys(contracts)) {
     const contract = contracts[contractName];
     const networks = contract.networks || {};
     if (appChainId && networks[appChainId]) {
+      matchedNetwork = true;
       const metaAddress = networks[appChainId].address;
-      if (appAddress && appAddress.toLowerCase() !== metaAddress.toLowerCase()) {
+      if (!appAddress || !metaAddress || appAddress.toLowerCase() !== metaAddress.toLowerCase()) {
         console.error(
           `FAIL [address mismatch] app.js address ${appAddress} ≠ metadata address ${metaAddress} for chain ${appChainId}`,
         );
@@ -105,6 +107,17 @@ function main() {
         console.log(`OK   [address] ${appAddress} matches metadata for chain ${appChainId}`);
       }
     }
+  }
+
+  if (!matchedNetwork) {
+    console.error(`FAIL no contract metadata for active chain ${appChainId}`);
+    errors += 1;
+  }
+  const config = JSON.parse(readFile(path.join(ROOT, 'web', 'base-deployment.json')));
+  if (appChainId === '8453' && (!config.ready || config.chainId !== 8453 ||
+      config.address?.toLowerCase() !== appAddress?.toLowerCase())) {
+    console.error('FAIL active frontend does not match activated Base deployment configuration');
+    errors += 1;
   }
 
   // 2. Check that all selectors listed in deployment-metadata.json are also referenced

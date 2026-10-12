@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Green Tea Hut #1 - Base Treasury</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+    <script defer src="treasury.js"></script>
+  </head>
+  <body class="treasury-page">
+    <main>
+      <h1>Green Tea Hut #1 - Base Treasury</h1>
+      <p><a href="./">Base project ledger and roadmap</a> | <a href="https://artizen.fund/index/p/green-tea-hut-1?season=7">Project campaign</a></p>
+      <p><strong>Base mainnet only (chain 8453).</strong> Never send funds to the old Optimism ledger.
+        Historical USD entries are not treasury balances or payout authorizations. ETH and token amounts are displayed separately.</p>
+      <p id="deployment-status" role="status">Checking deployment...</p>
+      <p id="treasury-status" role="status" aria-live="polite"></p>
+      <button id="connect-treasury" type="button">Connect wallet</button>
+      <button id="refresh-treasury" type="button">Refresh</button>
+      <section class="entry-section">
+        <h2>Treasury funds</h2>
+        <p id="treasury-access">No wallet connected.</p>
+        <p id="treasury-balance">Balance unavailable until deployment is verified.</p>
+        <form id="funds-form" class="entry-form">
+          <fieldset id="funds-controls" disabled>
+            <label>Asset <select id="funds-asset"><option value="ETH">ETH</option><option value="TOKEN">ERC-20 token</option></select></label>
+            <label>Base token contract (ERC-20 only) <input id="funds-token" placeholder="0x..." /></label>
+            <label>Amount (asset units, not USD) <input id="funds-amount" inputmode="decimal" required /></label>
+            <label>Recipient (payout only) <input id="funds-recipient" placeholder="0x..." /></label>
+            <label>Purpose / reference <input id="funds-reference" required /></label>
+            <button type="submit" value="deposit">Deposit</button>
+            <button id="send-funds" type="submit" value="payout" disabled>Send funds</button>
+          </fieldset>
+        </form>
+        <p>Token deposits request an allowance for the exact amount, then a separate deposit transaction.
+          Directly transferred ordinary ERC-20s can also be withdrawn by authorized managers.
+          NFTs, bridged assets on other chains, frozen tokens, and arbitrary token contracts are not supported.
+          Managers can spend the entire treasury; approve only trusted wallets.</p>
+      </section>
+      <section class="entry-section">
+        <h2>Owner controls</h2>
+        <form id="manager-form" class="entry-form">
+          <fieldset id="manager-controls" disabled>
+            <label>Manager wallet <input id="manager-address" required placeholder="0x..." /></label>
+            <label>Access <select id="manager-approved"><option value="true">Approve</option><option value="false">Revoke</option></select></label>
+            <button type="submit">Update manager</button>
+          </fieldset>
+        </form>
+        <form id="ownership-form" class="entry-form">
+          <fieldset id="ownership-controls" disabled>
+            <label>New owner wallet or Safe <input id="next-owner" required placeholder="0x..." /></label>
+            <button type="submit">Propose ownership transfer</button>
+          </fieldset>
+        </form>
+        <button id="accept-ownership" type="button" disabled>Accept pending ownership</button>
+        <p>Ownership transfers require acceptance by the new owner. Approved managers remain approved until revoked.</p>
+      </section>
+      <section class="entry-section">
+        <h2>Accounting entries (whole USD)</h2>
+        <p id="history-provenance"></p>
+        <p>Accounting updates do not move funds. Historical Optimism entries are immutable, even if originally requested or pending.
+          For a new payment, send funds above, then record its transaction link as accounting proof.
+          Never include imported balances as Base cash on hand.</p>
+        <form id="accounting-form" class="entry-form">
+          <fieldset id="accounting-controls" disabled>
+            <label>Type <select id="accounting-type"><option value="0">Incoming (pending)</option><option value="1">Outgoing (requested)</option></select></label>
+            <label>Whole USD amount <input id="accounting-amount" type="number" min="1" step="1" required /></label>
+            <label>Category <input id="accounting-category" required /></label>
+            <label>Description <input id="accounting-description" required /></label>
+            <label>Reference URL (optional) <input id="accounting-reference" type="url" /></label>
+            <button type="submit">Create accounting entry</button>
+          </fieldset>
+        </form>
+        <div class="table-wrap">
+          <table><thead><tr><th>ID / source</th><th>Amount (USD)</th><th>Type / status</th><th>Description</th><th>Proof</th><th>Actions</th></tr></thead><tbody id="treasury-entries"></tbody></table>
+        </div>
+      </section>
+      <section class="entry-section">
+        <h2>On-chain money movements</h2>
+        <p>These events cover deposits through the treasury and its payouts. Direct ERC-20 transfers and forced ETH may not emit treasury events; the balance above is the actual on-chain balance.</p>
+        <div class="table-wrap"><table><thead><tr><th>Direction</th><th>Asset</th><th>Raw units</th><th>Sender / recipient</th><th>Purpose</th><th>Transaction</th></tr></thead><tbody id="treasury-transfers"></tbody></table></div>
+      </section>
+    </main>
+  </body>
+</html>
