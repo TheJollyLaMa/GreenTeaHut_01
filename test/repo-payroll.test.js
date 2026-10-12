@@ -105,4 +105,9 @@ test('repo panel is inside the existing Labor & Services view and old clock cont
   assert.match(html, /src="repo-payroll.js"/);
   assert.match(app, /GreenTeaRepoPayroll.mount/);
   assert.doesNotMatch(fs.readFileSync('index.html', 'utf8'), /artizen\.fund|Network: Optimism/);
+  for (const name of ['bounty-bot', 'testing-bounty', 'settle-payroll']) {
+    const workflow = fs.readFileSync(`.github/workflows/${name}.yml`, 'utf8');
+    assert.match(workflow, /pages: write/);
+    assert.match(workflow, /gh api --method POST "repos\/\$\{GITHUB_REPOSITORY\}\/pages\/builds"/);
+  }
 });

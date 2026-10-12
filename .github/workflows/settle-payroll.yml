@@ -24,6 +24,7 @@ on:
 permissions:
   contents: write
   issues: write
+  pages: write
 
 jobs:
   settle:
@@ -59,3 +60,7 @@ jobs:
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore: settle verified Base USDC payroll"
           git push origin HEAD:main
+      - name: Rebuild public payroll data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds"

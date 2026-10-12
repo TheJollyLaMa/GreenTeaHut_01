@@ -66,6 +66,12 @@ contributor whitelist are separate.
    the change after GitHub Pages rebuilds. Until then it marks existing chain
    payouts as paid and awaiting GitHub settlement, not payable again.
 
+Queue-writing workflows explicitly request a Pages rebuild after the normal
+push. This is necessary because pushes made using `GITHUB_TOKEN` do not
+automatically trigger a Pages build. Manual recovery also requests a rebuild
+when no queue changes are needed, so a failed publication can be retried without
+paying or queueing work again.
+
 Submitted transaction hashes are retained in browser storage to prevent
 accidental resend during receipt/RPC failures. A refresh releases a reverted
 transaction for retry; unresolved transactions stay blocked. Review replaced
