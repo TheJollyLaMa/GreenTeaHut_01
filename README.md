@@ -160,3 +160,8 @@ npm run prepare:base -- 0x807061DF657A7697c04045dA7d16D941861cAABc
 Preparation creates unsigned transactions only; it does not deploy or use a
 private key. Compiled artifacts include compiler settings and complete
 standard-JSON sources for explorer verification.
+
+## License
+
+Code: [Apache-2.0](LICENSE) · Art and docs: [CC BY 4.0](LICENSES/CC-BY-4.0.txt) · Please keep the [NOTICE](NOTICE) and give The Jolly LaMa / A Decent Agency a head nod when you reuse this work.
+Support the work with a [Supporter DNFT](https://thejollylama.github.io/DecentMarket/).
